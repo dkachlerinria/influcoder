@@ -1,77 +1,64 @@
 # InfluCoder
 
-InfluCoder distills LoRA-gradient influence scores (LESS/TRAK-style) into a
-cheap sentence-encoder: a small bi-encoder is trained to reproduce the ranking
-that expensive per-sample gradient influence induces, so that scoring a
-candidate at selection time is a single forward pass instead of a
-forward+backward pass through the full target model.
+Distill gradient-influence rankings into a small text bi-encoder, so that at
+selection time scoring a candidate is one encoder forward pass instead of a
+forward+backward through the target LM.
 
-This repo is a trimmed extraction of the `runs/influence_spearman/` pipeline
-from a larger internal rebuttal repo (itself forked from the "Targeted
-Instruction Selection" codebase). Only the pieces needed to (a) compute a
-LoRA-gradient ground-truth influence matrix and (b) train + score InfluCoder
-against it are included here — the other baselines that lived alongside it
-(LESS, LoGRA, IProX, embeddings, TF-IDF, RDS+) are not reproduced in this repo.
+**Method.** Attach a fresh, seeded LoRA adapter to a target LM. Each sample's
+loss gradient on the adapter, sketched to `proj_dim` dims with a seeded
+CountSketch, is its *influence feature*; influence(anchor, candidate) =
+cosine of their features. On a **train** split of anchors x pool we compute
+that matrix and train a sentence encoder to reproduce it from text
+(Pearson + listwise-KL loss). On a **disjoint eval** split we compute the same
+gradient matrix as ground truth and report Spearman rank agreement of the
+encoder's scores against it — versus the untrained encoder as baseline.
 
-## How it works
+Anchors come from BBH (`data/eval/bbh/`, checked in), candidates from Dolly
+(`dolly/dolly_data.jsonl`, checked in). No downloads, no intermediate files.
 
-1. **`prepare_data.sh`** slices BBH (anchors/queries, `data/eval/bbh/`) and
-   Dolly (candidate pool, `dolly/dolly_data.jsonl`) into disjoint index ranges
-   shared by every downstream step, and tokenizes them.
-2. **`compute_ground_truth.sh`** attaches a fresh (untrained) seeded LoRA
-   adapter to the target decoder, computes per-sample SGD gradients on the
-   LoRA params, projects them (TRAK Rademacher projector) to `GT_PROJ_DIM`,
-   and takes cosine similarity between anchor and pool gradients → the
-   ground-truth (num_anchors × num_train) influence matrix.
-3. **`stock_influcoder_gradients.sh`** recomputes the *same* fresh-LoRA
-   gradients (same model/seed/formatting) for a separate encoder-training
-   split, but projects them with a cheaper sparse CountSketch projector to
-   `INFLUCODER_PROJ_DIM`.
-4. **`train_influcoder_encoder_68m.sh`** trains a `SentenceTransformer`
-   bi-encoder (`jhu-clsp/ettin-encoder-68m` by default) with a listwise
-   contrastive loss (Pearson + KL/MSE) to reproduce the CountSketch gradient
-   similarities.
-5. **`compute_influcoder_68m_scores.sh`** embeds the held-out eval anchors/pool
-   with the trained encoder (forward pass only) → InfluCoder's score matrix.
-6. **`run_experiment.py`** compares InfluCoder's score matrix against ground
-   truth via Spearman correlation (per-anchor and aggregated) and reports
-   FLOPs/timing/storage cost.
+## Layout
 
-`runs/influence_spearman/run_all.sh` runs steps 1–6 end to end.
+```
+run.py                    pipeline runner: presets, orchestration, results.json
+influcoder/data.py        BBH + Dolly loading, disjoint splits, text views
+influcoder/gradients.py   LoRA featurizer, CountSketch, projection-fidelity check
+influcoder/encoder.py     bi-encoder distillation (Pearson+KL loss, training loop)
+influcoder/metrics.py     Spearman metrics
+```
 
-## Setup
+## Setup & run
 
 ```bash
-conda create -n influcoder python=3.12 -c conda-forge
-conda activate influcoder
 pip install -r requirements.txt
+
+python run.py --preset sanity   # smallest end-to-end check + projection fidelity
+python run.py --preset tiny     # small but non-degenerate reproduction
 ```
 
-BBH eval data (`data/eval/bbh/`) and Dolly (`dolly/dolly_data.jsonl`) are
-already checked into this repo (small, ~3MB and ~14MB respectively) so no
-download step is required. If you need to refresh them, see
-`download_eval.sh`.
+Defaults: `SmolLM2-135M` as gradient source, `ettin-encoder-68m` as encoder
+(both configurable via `--grad_model` / `--encoder_model`). Results land in
+`runs_out/<preset>/results.json`.
 
-## Running
+The sanity preset also runs a **projection fidelity check**: exact pairwise
+gradient cosines vs. sketched cosines on held full gradients — the numeric
+proof that the featurizer core is correct, independent of any reference
+implementation.
 
-```bash
-# 1. Sanity check -- do all the steps run at all (~1-2 min)?
-bash runs/influence_spearman/run_all.sh runs/influence_spearman/config_sanity.sh
+## Hardware
 
-# 2. Tiny end-to-end reproduction -- small but non-degenerate sizes (~10-15 min)
-bash runs/influence_spearman/run_all.sh runs/influence_spearman/config_tiny_repro.sh
-```
+The code picks dtype/attention from the GPU's compute capability:
 
-Both configs use `HuggingFaceTB/SmolLM2-135M` as the gradient source and
-`jhu-clsp/ettin-encoder-68m` as the encoder to keep runtime small on a single
-GPU. Neither config is meant to reproduce paper-scale numbers — see
-`runs/influence_spearman/config_influence.sh` for the full-scale reference
-configuration (SmolLM2-1.7B decoder, `GT_PROJ_DIM=65536`, thousands of
-anchors/pool samples) that the tiny configs are cut down from.
+| GPU | What runs | Expected speed |
+|---|---|---|
+| Ampere or newer (A100, H100, A40, RTX 30/40/50xx) | bf16 + SDPA/flash | ~20–60 ms per gradient sample (135M model) |
+| Older (P100, V100) | fp32 + eager fallback | ~1 s per gradient sample — works, but slow |
 
-Results land in `${INFLUENCE_OUT}/results.json` (path printed at the end of
-the run), with a markdown Spearman/FLOPs table printed to stdout.
+Per-sample gradient extraction is the only real cost and it is embarrassingly
+parallel across samples; `torch.func` vmap'd per-sample gradients or sharding
+across GPUs are the known next steps if scale demands it.
 
-## Known deviations from the original pipeline
+## Correctness anchor
 
-See `KNOWN_ISSUES.txt` and `DEVIATIONS.md`.
+The original full pipeline this was rewritten from is preserved at the git tag
+`legacy-pipeline` (and in the upstream `tis-ie` repo). It is a reference
+oracle for cross-checking outputs if results ever look wrong — not a template.
