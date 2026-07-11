@@ -71,6 +71,40 @@ def load_dolly(path: Path | str, seed: int) -> list[Sample]:
     return samples
 
 
+def load_fineweb(n_samples: int, seed: int, min_chars: int = 800,
+                 max_chars: int = 2000, split_frac: float = 0.6) -> list[Sample]:
+    """FineWeb web-text documents, reduced to (context, target) via a
+    continuation split rather than an instruction/response split -- there is
+    no user/assistant structure here, so "target" is just the tail of the
+    document the "context" head precedes. Used as an out-of-distribution
+    pool: neither BBH's Q/A format nor Dolly's chat format, so it tests
+    whether the trained encoder generalizes past both training text shapes.
+
+    Streams a single fixed parquet shard directly (`data_files=...`) rather
+    than letting `datasets` resolve the whole `sample-10BT` config, which
+    tries to enumerate ~100 x 2GB files before yielding a single row.
+    """
+    from datasets import load_dataset
+
+    ds = load_dataset("HuggingFaceFW/fineweb", data_files="sample/10BT/000_00000.parquet",
+                      split="train", streaming=True)
+    rng = random.Random(seed)
+    samples = []
+    for row in ds:
+        text = row["text"].strip()
+        if len(text) < min_chars:
+            continue
+        text = text[:max_chars]
+        cut = text.rfind(" ", 0, int(len(text) * split_frac))
+        if cut <= 0:
+            continue
+        samples.append(Sample(context=text[:cut], target=text[cut:], text=text))
+        if len(samples) >= n_samples * 3:  # oversample, then shuffle-subselect
+            break
+    rng.shuffle(samples)
+    return samples[:n_samples]
+
+
 def disjoint_splits(anchors: list[Sample], pool: list[Sample],
                     n_eval_a: int, n_train_a: int,
                     n_eval_p: int, n_train_p: int) -> dict[str, list[Sample]]:
