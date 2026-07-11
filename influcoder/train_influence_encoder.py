@@ -491,8 +491,15 @@ if __name__ == "__main__":
     ).numpy()
 
     # 2. Training Loop
-    enc = SentenceTransformer(args.encoder_model, device=device)
-    enc.max_seq_length = 2048  # data is filtered to 512 Qwen tokens; 1024 is a safe ceiling for the encoder's own tokenizer
+    # attn_implementation="eager" pinned for hardware compatibility (flash-attn
+    # requires Ampere+; some encoders otherwise crash on older GPUs), matching
+    # the pin already used in compute_influcoder_scores.py.
+    enc = SentenceTransformer(args.encoder_model, device=device,
+                               model_kwargs={"attn_implementation": "eager"})
+    # Data is filtered to ~512 tokens by the gradient tokenizer; eager attention
+    # (forced above) is O(L^2) memory with no flash-attn savings, so keep this
+    # at the stated ceiling rather than the much larger 2048 used previously.
+    enc.max_seq_length = 512
     enc.train()
     loss_fn = InBatchLoss(alpha=args.alpha, mode=args.loss_mode)
     optimizer = torch.optim.AdamW(enc.parameters(), lr=args.lr, weight_decay=args.weight_decay)
@@ -574,7 +581,8 @@ if __name__ == "__main__":
     # 3. Final Evaluation (not counted toward training FLOPs)
     print("\n" + "=" * 70 + "\n🏁 FINAL EVALUATION\n" + "=" * 70)
     enc.eval()
-    base_enc = SentenceTransformer(args.encoder_model, device=device)
+    base_enc = SentenceTransformer(args.encoder_model, device=device,
+                                    model_kwargs={"attn_implementation": "eager"})
     base_enc.max_seq_length = enc.max_seq_length
 
     with torch.inference_mode():

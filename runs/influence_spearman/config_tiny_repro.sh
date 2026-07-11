@@ -8,6 +8,10 @@
 # Usage:
 #   bash runs/influence_spearman/run_all.sh runs/influence_spearman/config_tiny_repro.sh
 
+# Pre-Ampere GPUs (e.g. P100) can't run triton/inductor or flash-attn; the
+# ettin/ModernBERT encoder code paths hit both. Force eager everywhere.
+export TORCHDYNAMO_DISABLE=1
+
 # Small decoder (gradient source) -- already tiny, fast fwd+bwd on a single GPU.
 export INFLUENCE_MODEL="HuggingFaceTB/SmolLM2-135M"
 INFLUENCE_MODEL_SLUG=$(echo "${INFLUENCE_MODEL}" | tr '[:upper:]' '[:lower:]' | sed 's|.*/||')
