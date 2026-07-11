@@ -62,7 +62,7 @@ def main():
     torch.manual_seed(args.seed)
 
     anchors = load_bbh("data/eval/bbh", seed=42)[: args.n_anchors]
-    pool = load_fineweb(args.n_pool, seed=42)
+    pool = load_fineweb(seed=42)[: args.n_pool]
     print(f"anchors: {len(anchors)} (BBH, in-distribution -- unchanged from training)")
     print(f"pool:    {len(pool)} (FineWeb, out-of-distribution -- never seen in training)")
 

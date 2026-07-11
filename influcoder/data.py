@@ -71,7 +71,7 @@ def load_dolly(path: Path | str, seed: int) -> list[Sample]:
     return samples
 
 
-def load_fineweb(n_samples: int, seed: int, min_chars: int = 800,
+def load_fineweb(seed: int, max_docs: int = 600, min_chars: int = 800,
                  max_chars: int = 2000, split_frac: float = 0.6) -> list[Sample]:
     """FineWeb web-text documents, reduced to (context, target) via a
     continuation split rather than an instruction/response split -- there is
@@ -83,12 +83,16 @@ def load_fineweb(n_samples: int, seed: int, min_chars: int = 800,
     Streams a single fixed parquet shard directly (`data_files=...`) rather
     than letting `datasets` resolve the whole `sample-10BT` config, which
     tries to enumerate ~100 x 2GB files before yielding a single row.
+
+    Returns a fixed-size, seeded-shuffle list like load_bbh/load_dolly --
+    callers slice front ranges for eval/train (e.g. via disjoint_splits) and
+    get a disjoint set regardless of how many they ultimately take, because
+    the scan itself doesn't depend on the caller's requested size.
     """
     from datasets import load_dataset
 
     ds = load_dataset("HuggingFaceFW/fineweb", data_files="sample/10BT/000_00000.parquet",
                       split="train", streaming=True)
-    rng = random.Random(seed)
     samples = []
     for row in ds:
         text = row["text"].strip()
@@ -99,10 +103,10 @@ def load_fineweb(n_samples: int, seed: int, min_chars: int = 800,
         if cut <= 0:
             continue
         samples.append(Sample(context=text[:cut], target=text[cut:], text=text))
-        if len(samples) >= n_samples * 3:  # oversample, then shuffle-subselect
+        if len(samples) >= max_docs:
             break
-    rng.shuffle(samples)
-    return samples[:n_samples]
+    random.Random(seed).shuffle(samples)
+    return samples
 
 
 def disjoint_splits(anchors: list[Sample], pool: list[Sample],
