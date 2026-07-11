@@ -43,13 +43,43 @@ def pearson_kl_loss(scores: torch.Tensor, labels: torch.Tensor,
     return alpha * pearson + (1 - alpha) * kl
 
 
+def _sample_candidates(rng, targets_row_block: torch.Tensor, n_pool: int,
+                       m_candidates: int, hard_ratio: float) -> torch.Tensor:
+    """m_candidates indices into the pool: a hard_ratio fraction are the
+    hardest negatives for this anchor block (highest target similarity --
+    the ones a lazy encoder would conflate), the rest uniform random. Pure
+    random candidates are almost all easy negatives once the pool is more
+    than a few dozen items, so the loss stops teaching the encoder anything
+    once it clears the easy majority; hard negatives keep gradient signal
+    where the ranking is actually still wrong."""
+    n_hard = int(m_candidates * hard_ratio)
+    if n_hard > 0:
+        # union of each anchor's top candidates, so a block of anchors pulls
+        # in a diverse hard set rather than one anchor's neighborhood only
+        top_k = max(1, n_hard // targets_row_block.shape[0] + 1)
+        hard = torch.unique(targets_row_block.topk(min(top_k * 2, n_pool), dim=1).indices)
+        if hard.numel() > n_hard:
+            hard = hard[torch.randperm(hard.numel())[:n_hard]]
+    else:
+        hard = torch.empty(0, dtype=torch.long)
+    n_random = m_candidates - hard.numel()
+    remaining = [i for i in range(n_pool) if i not in set(hard.tolist())]
+    random_idx = torch.tensor(rng.sample(remaining, min(n_random, len(remaining))))
+    return torch.cat([hard, random_idx])
+
+
 def distill(enc, anchor_texts: list[str], pool_texts: list[str],
             targets: torch.Tensor, epochs: int, k_anchors: int = 8,
             m_candidates: int = 16, lr: float = 5e-5, seed: int = 0,
-            epoch_eval=None) -> list[float]:
-    """Each step embeds a block of k anchors x m random candidates and
-    regresses the cosine block onto the gradient targets. Returns per-epoch
-    mean losses."""
+            hard_ratio: float = 0.5, epoch_eval=None,
+            select_best_on: str = "per_anchor_mean") -> dict:
+    """Each step embeds a block of k anchors x m candidates (mixed
+    random/hard-negative) and regresses the cosine block onto the gradient
+    targets. Restores the encoder to whichever epoch scored best on
+    `epoch_eval` (by `select_best_on`) before returning -- eval Spearman is
+    noisy at these sample sizes and reliably peaks then degrades, so
+    reporting the last epoch is reporting overfitting, not the method.
+    Returns {"epoch_losses", "epoch_metrics", "best_epoch"}."""
     device = enc.device.type if hasattr(enc.device, "type") else "cuda"
     amp_dtype, _ = hardware_profile(device)
     use_scaler = amp_dtype == torch.float32  # pre-Ampere: autocast fp16 + scaler
@@ -68,7 +98,8 @@ def distill(enc, anchor_texts: list[str], pool_texts: list[str],
         feats = enc.tokenize(texts)
         return {k: v.to(device) for k, v in feats.items() if torch.is_tensor(v)}
 
-    epoch_losses = []
+    epoch_losses, epoch_metrics = [], []
+    best_score, best_epoch, best_state = -float("inf"), -1, None
     enc.train()
     for epoch in range(epochs):
         order = list(range(len(anchor_texts)))
@@ -76,8 +107,8 @@ def distill(enc, anchor_texts: list[str], pool_texts: list[str],
         losses = []
         for i in range(0, len(order), k_anchors):
             a_idx = torch.tensor(order[i:i + k_anchors])
-            c_idx = torch.tensor(rng.sample(range(len(pool_texts)),
-                                            min(m_candidates, len(pool_texts))))
+            c_idx = _sample_candidates(rng, targets[a_idx], len(pool_texts),
+                                       m_candidates, hard_ratio)
             a_feats = tokenize([anchor_texts[j] for j in a_idx])
             c_feats = tokenize([pool_texts[j] for j in c_idx])
             with torch.amp.autocast(device, dtype=autocast_dtype):
@@ -96,8 +127,18 @@ def distill(enc, anchor_texts: list[str], pool_texts: list[str],
         msg = f"  epoch {epoch + 1}/{epochs}  loss={epoch_losses[-1]:.4f}"
         if epoch_eval is not None:
             m = epoch_eval()
+            epoch_metrics.append(m)
             msg += (f"  eval per-anchor rho={m['per_anchor_mean']:+.4f}"
                     f"  agg rho={m['aggregated']:+.4f}")
+            if m[select_best_on] > best_score:
+                best_score, best_epoch = m[select_best_on], epoch
+                best_state = {k: v.detach().cpu().clone() for k, v in enc.state_dict().items()}
+                msg += "  *"
             enc.train()
         print(msg)
-    return epoch_losses
+
+    if best_state is not None:
+        enc.load_state_dict(best_state)
+        print(f"  restored best checkpoint: epoch {best_epoch + 1} "
+              f"({select_best_on}={best_score:+.4f})")
+    return {"epoch_losses": epoch_losses, "epoch_metrics": epoch_metrics, "best_epoch": best_epoch}
