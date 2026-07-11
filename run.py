@@ -51,6 +51,12 @@ PRESETS = {
     "push":   dict(n_eval_a=15, n_eval_p=40, n_train_a=200, n_train_p=400,
                    epochs=20, proj_dim=8192, grad_max_len=1024, check_projection=False,
                    hard_ratio=0.5),
+    # Bigger, noise-resistant eval set (100x100 vs. 15x40) + a larger train
+    # side, no hard-negative mining (isolates whether mining vs. scale is
+    # doing the work), fewer epochs (push's best epoch landed at 9/20).
+    "big":    dict(n_eval_a=100, n_eval_p=100, n_train_a=500, n_train_p=1000,
+                   epochs=8, proj_dim=8192, grad_max_len=1024, check_projection=False,
+                   hard_ratio=0.0),
 }
 
 
@@ -144,6 +150,10 @@ def main():
     final = eval_spearman()  # re-measured post-restore; should match the best epoch's logged value
     timings["final_eval"] = time.time() - t0
 
+    encoder_dir = out_dir / "encoder"
+    enc.save(str(encoder_dir))
+    print(f"saved trained encoder: {encoder_dir}")
+
     # -- report ----------------------------------------------------------------
     print("\n=== results ===")
     print(f"{'':24s}{'per-anchor rho':>16s}{'agg rho':>10s}")
@@ -163,6 +173,7 @@ def main():
         "projection_check": proj_check,
         "baseline": baseline,
         "trained": final,
+        "encoder_dir": str(encoder_dir),
         "best_epoch": train_log["best_epoch"],
         "epoch_losses": train_log["epoch_losses"],
         "epoch_metrics": train_log["epoch_metrics"],

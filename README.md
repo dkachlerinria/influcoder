@@ -33,11 +33,20 @@ pip install -r requirements.txt
 
 python run.py --preset sanity   # smallest end-to-end check + projection fidelity
 python run.py --preset tiny     # small but non-degenerate reproduction
+python run.py --preset push     # bigger train side, hard-negative mining
+python run.py --preset big      # bigger eval+train, no mining, fewer epochs
 ```
 
 Defaults: `SmolLM2-135M` as gradient source, `ettin-encoder-68m` as encoder
-(both configurable via `--grad_model` / `--encoder_model`). Results land in
-`runs_out/<preset>/results.json`.
+(both configurable via `--grad_model` / `--encoder_model`). Each run writes to
+`runs_out/<preset>/` (gitignored -- these are outputs, not source):
+
+- `results.json` -- config, baseline/trained Spearman, per-epoch metrics, timings
+- `encoder/` -- the trained encoder (best-checkpoint-restored), loadable directly:
+  ```python
+  from sentence_transformers import SentenceTransformer
+  enc = SentenceTransformer("runs_out/<preset>/encoder")
+  ```
 
 The sanity preset also runs a **projection fidelity check**: exact pairwise
 gradient cosines vs. sketched cosines on held full gradients — the numeric
