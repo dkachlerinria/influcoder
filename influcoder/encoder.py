@@ -71,7 +71,7 @@ def _sample_candidates(rng, targets_row_block: torch.Tensor, n_pool: int,
 def distill(enc, anchor_texts: list[str], pool_texts: list[str],
             targets: torch.Tensor, epochs: int, k_anchors: int = 8,
             m_candidates: int = 16, lr: float = 5e-5, seed: int = 0,
-            hard_ratio: float = 0.5, epoch_eval=None,
+            hard_ratio: float = 0.5, alpha: float = 0.5, epoch_eval=None,
             select_best_on: str = "per_anchor_mean") -> dict:
     """Each step embeds a block of k anchors x m candidates (mixed
     random/hard-negative) and regresses the cosine block onto the gradient
@@ -114,7 +114,7 @@ def distill(enc, anchor_texts: list[str], pool_texts: list[str],
             with torch.amp.autocast(device, dtype=autocast_dtype):
                 za = F.normalize(enc(a_feats)["sentence_embedding"], dim=1)
                 zc = F.normalize(enc(c_feats)["sentence_embedding"], dim=1)
-                loss = pearson_kl_loss(za @ zc.T, targets[a_idx][:, c_idx].to(device))
+                loss = pearson_kl_loss(za @ zc.T, targets[a_idx][:, c_idx].to(device), alpha=alpha)
             scaler.scale(loss).backward()
             scaler.unscale_(opt)
             torch.nn.utils.clip_grad_norm_(enc.parameters(), 1.0)
