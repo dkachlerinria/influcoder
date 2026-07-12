@@ -54,7 +54,7 @@ the user rather than editing it out from under them.
 
 | Agent / branch | File(s) | Task | Started |
 |---|---|---|---|
-| _(none)_ | | | |
+| agent/sample-eff | new: `sample_efficiency_sweep.py` (root-level, no shared module edits) | Rebuttal: sample-count degradation curve + recovery interventions at reduced anchor/pool counts | 2026-07-12 |
 
 ## 3. Don't touch `legacy-pipeline`
 
