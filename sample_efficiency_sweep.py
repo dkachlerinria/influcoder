@@ -62,6 +62,20 @@ SIZE_TRIALS = [
     (500, 1000), (250, 500), (125, 250), (62, 125), (30, 60), (16, 32), (8, 16),
 ]
 
+# Free-form hyperparameter exploration at a FIXED data size (125x250 --
+# the point on the part-A curve where alpha=0.2 generalized best). Data
+# never changes here, only the recipe.
+EXPLORE_TRIALS = [
+    ("reduced_baseline",  {}),
+    ("kl_weighted",       dict(alpha=0.2)),          # already known: agg 0.397->0.417
+    ("kl_only",           dict(alpha=0.0)),
+    ("kl_hard",           dict(alpha=0.2, hard_ratio=0.3)),
+    ("kl_more_epochs",    dict(alpha=0.2, epochs=16)),
+    ("kl_higher_lr",      dict(alpha=0.2, lr=1e-4)),
+    ("kl_bigger_batch",   dict(alpha=0.2, m_candidates=32)),
+    ("kl_lr_epochs",      dict(alpha=0.2, lr=1e-4, epochs=16)),
+]
+
 GRAD_MODEL = "HuggingFaceTB/SmolLM2-135M"
 PROJ_DIM = 8192
 GRAD_MAX_LEN = 1024
@@ -136,7 +150,7 @@ def run_trial(cache, gt, na, np_, cfg, seed, encoder_model):
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--part", choices=["a", "b"], required=True)
+    ap.add_argument("--part", choices=["a", "b", "explore"], required=True)
     ap.add_argument("--encoder_model", default="jhu-clsp/ettin-encoder-68m")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--out_dir", default="runs_out/sample_eff")
@@ -167,6 +181,28 @@ def main():
         with open(out_dir / "part_a_results.json", "w") as f:
             json.dump(results, f, indent=2)
         print(f"\nwrote {out_dir / 'part_a_results.json'}")
+
+    elif args.part == "explore":
+        na, np_ = args.b_na or 125, args.b_np or 250
+        trials = EXPLORE_TRIALS
+        if args.only:
+            trials = [(n, d) for n, d in trials if n in args.only]
+        reduced = dict(BASELINE, n_train_a=na, n_train_p=np_)
+        results = {"size": {"n_train_a": na, "n_train_p": np_},
+                  "recipe": reduced, "trials": {}}
+        print(f"\nexplore at {na}x{np_} (data fixed, recipe varies):")
+        print(f"{'trial':20s}{'delta':>38s}{'per-anchor rho':>16s}{'agg rho':>10s}{'time(s)':>9s}")
+        for name, delta in trials:
+            cfg = {**reduced, **delta}
+            r = run_trial(cache, gt, na, np_, cfg, args.seed, args.encoder_model)
+            r["delta"] = delta
+            results["trials"][name] = r
+            print(f"{name:20s}{str(delta):>38s}{r['trained']['per_anchor_mean']:>+16.4f}"
+                  f"{r['trained']['aggregated']:>+10.4f}{r['elapsed_s']:>9.0f}")
+        out_path = out_dir / f"explore_{na}x{np_}_results.json"
+        with open(out_path, "w") as f:
+            json.dump(results, f, indent=2)
+        print(f"\nwrote {out_path}")
 
     else:
         if args.b_na is None or args.b_np is None:
