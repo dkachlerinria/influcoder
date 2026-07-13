@@ -54,7 +54,7 @@ the user rather than editing it out from under them.
 
 | Agent / branch | File(s) | Task | Started |
 |---|---|---|---|
-| _(none)_ | | | |
+| agent/baselines | `eval_size_sensitivity.py` (new) | Test whether eval-set size (100/400/800) affects InfluCoder's measured Spearman | 2026-07-13 |
 
 ## 3. Don't touch `legacy-pipeline`
 
