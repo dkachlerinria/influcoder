@@ -54,7 +54,7 @@ the user rather than editing it out from under them.
 
 | Agent / branch | File(s) | Task | Started |
 |---|---|---|---|
-| agent/baselines | `eval_ood_legacy_gt.py` (new) | OOD-pool re-test vs. actual GT + new OOD-query variant (pool kept in-distribution, anchors swapped) | 2026-07-13 |
+| _(none)_ | | | |
 
 ## 3. Don't touch `legacy-pipeline`
 
