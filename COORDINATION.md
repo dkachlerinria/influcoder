@@ -54,7 +54,7 @@ the user rather than editing it out from under them.
 
 | Agent / branch | File(s) | Task | Started |
 |---|---|---|---|
-| agent/sample-eff | `influcoder/legacy_gt.py` (cherry-picked from agent/baselines), `sample_efficiency_sweep_legacy_gt.py` (new) | Re-run the Part A sample-efficiency degradation curve, evaluated against tis-ie's actual ground truth | 2026-07-13 |
+| agent/sample-eff | `influcoder/baselines.py`, `influcoder/logra.py` (cherry-picked from agent/baselines), `compare_baselines_on_sample_eff_data.py` (new) | Score LESS/LoGRA/RDS+/TF-IDF/embedding on the same fixed 100x100 eval set + GTs as the sample-eff sweep | 2026-07-13 |
 
 ## 3. Don't touch `legacy-pipeline`
 
