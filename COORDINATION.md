@@ -54,7 +54,7 @@ the user rather than editing it out from under them.
 
 | Agent / branch | File(s) | Task | Started |
 |---|---|---|---|
-| agent/baselines | `run.py` (new preset only), `influcoder/baselines.py` (new) | Port LESS/LoGRA/RDS+/TF-IDF/embedding baselines from tis-ie | 2026-07-13 |
+| agent/baselines | `influcoder/baselines.py`, `influcoder/logra.py`, `run_baselines.py` (all new files, run.py untouched) | Port LESS/LoGRA/RDS+/TF-IDF/embedding baselines from tis-ie | 2026-07-13 |
 
 ## 3. Don't touch `legacy-pipeline`
 
