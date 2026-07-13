@@ -54,7 +54,7 @@ the user rather than editing it out from under them.
 
 | Agent / branch | File(s) | Task | Started |
 |---|---|---|---|
-| _(none)_ | | | |
+| agent/baselines | `influcoder/legacy_gt.py`, `retest_against_legacy_gt.py` (new files) | Port tis-ie's actual (TRAK-projected) ground truth; re-test trained encoder against it | 2026-07-13 |
 
 ## 3. Don't touch `legacy-pipeline`
 
