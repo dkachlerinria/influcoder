@@ -54,7 +54,8 @@ the user rather than editing it out from under them.
 
 | Agent / branch | File(s) | Task | Started |
 |---|---|---|---|
-| _(none)_ | | | |
+| agent/baselines | `influcoder/legacy_gt.py` (refactor: `LegacyGradientFeaturizer`), `eval_size_sensitivity_1p7b.py` (new) | Rebuttal Exp 2 (eval-size sensitivity, 1.7B/TRAK, tis-ie-faithful) | 2026-07-13 |
+| agent/sample-eff | `influcoder/legacy_gt.py` (cherry-picked refactor), `sample_efficiency_sweep_1p7b.py` (new) | Rebuttal Exp 1 (min. training data, 1.7B/TRAK, tis-ie-faithful) | 2026-07-13 |
 
 ## 3. Don't touch `legacy-pipeline`
 
