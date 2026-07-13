@@ -54,7 +54,7 @@ the user rather than editing it out from under them.
 
 | Agent / branch | File(s) | Task | Started |
 |---|---|---|---|
-| _(none)_ | | | |
+| agent/sample-eff | `influcoder/legacy_gt.py` (cherry-picked from agent/baselines), `sample_efficiency_sweep_legacy_gt.py` (new) | Re-run the Part A sample-efficiency degradation curve, evaluated against tis-ie's actual ground truth | 2026-07-13 |
 
 ## 3. Don't touch `legacy-pipeline`
 
