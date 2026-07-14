@@ -54,7 +54,6 @@ the user rather than editing it out from under them.
 
 | Agent / branch | File(s) | Task | Started |
 |---|---|---|---|
-| agent/baselines | `less_baseline_1p7b.py` (new) | LESS baseline (1.7B/TRAK-faithful, proj_dim=8192) on Exp 2's exact eval data, for sanity-check comparison | 2026-07-14 |
 
 ## 3. Don't touch `legacy-pipeline`
 
