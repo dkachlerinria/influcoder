@@ -102,10 +102,19 @@ PRESETS = {
     # (prompt/answer pairs, streamed from HF) instead of Dolly -- everything
     # else (BBH anchors, eval/train sizes, GT model/rank) held fixed so the
     # two tables are comparable except for the candidate-pool distribution.
+    # encoder_max_len=1024 (vs. the 512 every other preset gets via
+    # load_encoder's default): dolci-instruct's prompt/answer text runs much
+    # longer than Dolly's (median ~400 encoder tokens vs. ~120, p90 ~1000).
+    # At 512 the bi-encoder was silently losing >50% of the answer on ~24%
+    # of pool samples (0% of it on 5.6%) while the GT gradient target is
+    # computed from a target-prioritized truncation that keeps that content
+    # -- a real train/eval signal-corruption bug, not a cost/quality choice.
+    # 1024 (matching grad_max_len) cuts that to <5% / 0.6%. Ettin encoders
+    # support up to ~8000 tokens so this is well within capacity.
     "fig1_dolci": dict(n_eval_a=400, n_eval_p=400, n_train_a=1500, n_train_p=3000,
                        epochs=8, proj_dim=65536, grad_max_len=1024,
                        check_projection=False, hard_ratio=0.0,
-                       pool="dolci_instruct"),
+                       pool="dolci_instruct", encoder_max_len=1024),
 }
 
 
@@ -175,7 +184,7 @@ def main():
 
     # -- encoder --------------------------------------------------------------
     t0 = time.time()
-    enc = load_encoder(args.encoder_model)
+    enc = load_encoder(args.encoder_model, max_seq_len=cfg.get("encoder_max_len", 512))
     eval_a_texts = [s.text for s in splits["eval_anchors"]]
     eval_p_texts = [s.text for s in splits["eval_pool"]]
 

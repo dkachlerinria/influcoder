@@ -1071,4 +1071,66 @@ Secondary findings: the 0.6B LoGRA proxy is far more competitive here
 influence signal on this heterogeneous pool. RDS+ drops from +0.31 to
 +0.10.
 
+**UPDATE -- found and fixed a real bug in the above, but the headline
+finding survives it.** User asked to check for bugs before accepting the
+"distillation doesn't help" result. Found one: `load_encoder()` (and every
+caller: `train_fig1_encoders.py`, `figure1_table.py`'s `score_influcoder`/
+`score_semantic`) hardcoded `max_seq_len=512` tokens for the bi-encoder.
+Fine for Dolly (median encoder-text ~120 tokens) but wrong for
+dolci-instruct, whose `text = prompt + answer` runs far longer (median
+~400 tokens, p90 ~1000). Measured directly: at the 512 cap, 24% of pool
+samples had **less than half** their answer inside the truncation window
+and 5.6% had **none of it** -- meanwhile the GT gradient-influence target
+for those same samples is computed from `tokenize_sample`'s
+target-prioritized truncation (`grad_max_len=1024`, target capped at 512
+tokens, *context* tail-truncated to make room), so GT saw the answer the
+encoder never did. A real train/eval signal-corruption bug, not a
+cost/quality tradeoff -- the Ettin encoders support up to ~8000 tokens
+natively, so 512 was just an under-provisioned default that happened to
+work by accident on Dolly's shorter text.
+
+**Fix**: added `encoder_max_len` to preset configs (`run.py`), threaded
+through `load_encoder`/`score_influcoder`/`score_semantic`; set to 1024
+(matching `grad_max_len`) for `fig1_dolci` only -- `fig1` (Dolly) is
+untouched, still correct at 512, its already-committed numbers don't move.
+At 1024, mean answer coverage rises from 76%->94%, fully-truncated
+samples drop from 5.6%->0.6%.
+
+**Effect of the fix**, retraining all 3 encoders and rescoring:
+
+| method | 512 (buggy) | 1024 (fixed) |
+|---|---|---|
+| untrained_68m | +0.1758 | **+0.3196** |
+| influcoder_68m | +0.1676 | +0.0466 |
+| untrained_150m | +0.1576 | **+0.2766** |
+| influcoder_150m | +0.1213 | +0.1230 |
+| untrained_400m | +0.1498 | **+0.2116** |
+| influcoder_400m | +0.1563 | +0.0744 |
+
+The bug was real and mattered a lot -- fixing it nearly doubles every
+untrained-encoder score, bringing them back into the same range as Dolly's
+untrained baselines (+0.33 to +0.43). But it does **not** rescue
+InfluCoder: trained now sits *below* untrained at every single size (was
+roughly tied before the fix), and 68m/400m got worse in absolute terms.
+Training logs are unambiguous and consistent across all 3 sizes: eval agg
+rho peaks at epoch 3/8, then degrades every epoch after even as train loss
+keeps falling monotonically to near-zero (e.g. 400m: epoch 3 peak +0.0743,
+epoch 8 loss=0.043 but agg rho=-0.056) -- textbook overfitting to the
+distillation targets, not a truncation artifact, since it reproduces
+identically at both max_len settings.
+
+Stopping here rather than continuing to tweak hyperparameters until a run
+"looks good": one confirmed, fixed bug is enough justification to rerun;
+blindly retrying without a specific new hypothesis would just be
+p-hacking a result. If this is worth chasing further, the next real lever
+is the distillation recipe itself (lr, hard-negative mining, regularization,
+or whether the gradient-influence targets are simply noisier/less learnable
+on this heterogeneous a pool), not another truncation-style bug -- not
+attempted here.
+
+Final artifacts: `baselines/out/fig1_dolci/{table1.json,figure1.png}`. The
+buggy 512-cap run is kept for reference at
+`baselines/out/fig1_dolci_512cap_buggy/` and
+`runs_out/fig1_dolci_512cap_buggy/` rather than deleted.
+
 ---

@@ -77,12 +77,12 @@ OFFSETS = {
 # labels on top of each other here, so this preset gets its own fan-out.
 OFFSETS_DOLCI = {
     **OFFSETS,
-    "untrained_68m": (-4, 4, "right"),
-    "influcoder_68m": (-6, -20, "right"),
-    "untrained_150m": (0, 34, "center"),
-    "influcoder_150m": (0, -34, "center"),
-    "influcoder_400m": (6, 22, "left"),
-    "untrained_400m": (6, -16, "left"),
+    "untrained_68m": (4, 6, "left"),
+    "untrained_150m": (4, 6, "left"),
+    "untrained_400m": (4, 6, "left"),
+    "influcoder_68m": (4, -14, "left"),
+    "influcoder_150m": (4, 8, "left"),
+    "influcoder_400m": (4, -14, "left"),
 }
 
 

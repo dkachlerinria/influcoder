@@ -126,13 +126,14 @@ def main():
     # -- InfluCoder (3 sizes, trained encoders) + untrained encoder baseline --
     from baselines.influcoder.score import score_influcoder
     from baselines.semantic.score import score_semantic
+    encoder_max_len = cfg.get("encoder_max_len", 512)
     for size, model_name in ENCODER_MODELS.items():
         encoder_dir = enc_dir / f"encoder_{size}"
         run_row(f"influcoder_{size}", lambda meter, d=str(encoder_dir):
-               score_influcoder(splits, d, max_len=512, meter=meter),
+               score_influcoder(splits, d, max_len=encoder_max_len, meter=meter),
                splits, cfg, gt, n_samples, all_metrics)
         run_row(f"untrained_{size}", lambda meter, m=model_name:
-               score_semantic(splits, m, max_len=512, meter=meter),
+               score_semantic(splits, m, max_len=encoder_max_len, meter=meter),
                splits, cfg, gt, n_samples, all_metrics)
 
     # -- RDS+ -------------------------------------------------------------------

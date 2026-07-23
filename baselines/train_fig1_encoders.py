@@ -62,7 +62,7 @@ def main():
     for size, model_name in ENCODERS.items():
         print(f"\n########## training InfluCoder ({size}) ##########")
         t0 = time.time()
-        enc = load_encoder(model_name)
+        enc = load_encoder(model_name, max_seq_len=cfg.get("encoder_max_len", 512))
 
         def ev():
             return spearman_metrics(embed(enc, eval_a) @ embed(enc, eval_p).T, gt)
