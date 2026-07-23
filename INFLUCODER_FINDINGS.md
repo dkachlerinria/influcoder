@@ -996,3 +996,79 @@ LoGRA rows in `table1.json`: logra_r8 199.97ms -> **144.35ms** (agg
 142.11ms -> **126.26ms** (agg +0.0302 -> +0.0345). Figure regenerated.
 
 ---
+
+## Figure 1 rebuilt on tasksource/dolci-instruct (pool swap, everything else fixed)
+
+User request: recreate the whole Figure 1 pipeline with the Dolly candidate
+pool replaced by `tasksource/dolci-instruct` (flat `prompt`/`answer`/`task`
+schema, 8 parquet shards, ~1.8M rows -- no chat-message wrapping like
+Dolly's JSONL), BBH anchors unchanged, every other setting held identical
+(400x400 eval, 1500x3000 train, GT = Qwen3-4B rank 16, SDPA/batch_size=1
+methodology).
+
+**Plumbing**: added `load_dolci_instruct()` (streams shards via
+`datasets.load_dataset(..., streaming=True)`, same `Sample(context, target,
+text)` shape and seeded-shuffle contract as `load_dolly`) and a
+`load_pool(name, seed)` dispatcher to `influcoder/data.py`; added a
+`"fig1_dolci"` preset (`pool="dolci_instruct"`) to `run.py`'s `PRESETS`;
+`baselines/common.py`'s `build_splits`/`_gt_key` now route through
+`cfg.get("pool", "dolly")` so the Dolly presets are untouched and the GT
+cache key includes the pool. `figure1_table.py`, `train_fig1_encoders.py`,
+and `plot_figure1.py` all took a `--preset` arg instead of hardcoding
+`"fig1"`, deriving `out_dir`/`enc_dir` from the preset name.
+
+**Batch size override (user-requested, NOT the default methodology)**: the
+user asked to batch the two LoGRA proxies (1.7B, 0.6B) as large as
+possible instead of the official batch_size=1. This is the same
+quality-drift tradeoff documented above (batch_size stays at 1 for the
+*official* methodology precisely because batching moves the aggregated
+Spearman rho by a real, non-noise amount) -- flagged explicitly, user
+confirmed override. Applied batch_size=4 (the max-feasible ceiling found
+earlier; both OOM at 8) via a new `baselines/update_proxy_rows_batched.py`,
+kept separate from `figure1_table.py`'s default path so the apples-to-apples
+batch=1 run stays reproducible with one command. The main `logra_r8` (4B)
+row is untouched at batch_size=1 -- it already OOMs at batch=4.
+
+**Results** (`baselines/out/fig1_dolci/table1.json`,
+`baselines/out/fig1_dolci/figure1.png`), vs. the Dolly table:
+
+| method | dolly agg | dolci agg | dolly ms | dolci ms |
+|---|---|---|---|---|
+| less | +0.9571 | +0.9517 | 358.5 | 390.6 |
+| logra_r8 | +0.8982 | +0.9080 | 144.3 | 153.8 |
+| logra_proxy_1.7B | +0.5088 | +0.5783 | 130.3 | 131.1 (bs=4) |
+| logra_proxy_0.6B | +0.0345 | +0.3046 | 126.3 | 98.0 (bs=4) |
+| influcoder_68m | +0.7816 | +0.1676 | 1.30 | 2.41 |
+| untrained_68m | +0.3863 | +0.1758 | 1.13 | 2.37 |
+| influcoder_150m | +0.7598 | +0.1213 | 2.01 | 4.17 |
+| untrained_150m | +0.3304 | +0.1576 | 2.00 | 4.13 |
+| influcoder_400m | +0.8102 | +0.1563 | 4.13 | 8.10 |
+| untrained_400m | +0.4297 | +0.1498 | 4.12 | 8.10 |
+| rdsplus | +0.3060 | +0.1038 | 56.1 | 67.4 |
+| tfidf | +0.2985 | -0.0944 | 0.41 | 0.19 |
+
+Headline finding: **InfluCoder's distillation gain essentially vanishes on
+dolci-instruct.** On Dolly, distillation adds +0.35 to +0.40 agg rho over
+the untrained encoder baseline at every size (0.33-0.43 -> 0.76-0.81). On
+dolci-instruct, trained and untrained land in the same tight 0.12-0.18
+band, and the ordering even flips at 68m/150m (untrained beats trained).
+Loss curves in `train_fig1_encoders`'s log show why: eval agg rho peaks
+early (epoch 3-4 of 8) then degrades every subsequent epoch as train loss
+keeps falling -- textbook overfitting to the distillation targets rather
+than learning transferable structure, worse than on Dolly. Plausible cause:
+dolci-instruct is an SFT-mix aggregate (task field shows it's sourced from
+allenai's olmo-3-instruct-sft mix) spanning very heterogeneous task types
+(math word problems, crystallography, content moderation, multilingual) in
+one flat prompt/answer pool, vs. Dolly's more uniform open-domain
+instruction-following shape -- the bi-encoder may need more/better epoch
+selection or a different train-side sampling strategy to generalize across
+that heterogeneity, not investigated further here.
+
+Secondary findings: the 0.6B LoGRA proxy is far more competitive here
+(+0.30 vs +0.03 on Dolly) while the 1.7B proxy also improves (+0.58 vs
++0.51) -- both proxies transfer better on this pool. TF-IDF goes
+*negative* (-0.09, vs +0.30 on Dolly) -- lexical overlap is a much weaker
+influence signal on this heterogeneous pool. RDS+ drops from +0.31 to
++0.10.
+
+---

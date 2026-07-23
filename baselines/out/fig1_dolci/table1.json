@@ -1,0 +1,193 @@
+{
+  "config": {
+    "preset": "fig1_dolci",
+    "pool": "dolci_instruct",
+    "grad_model": "Qwen/Qwen3-4B",
+    "gt_lora_rank": 16,
+    "gt_shape": [
+      400,
+      400
+    ],
+    "seed": 0
+  },
+  "methods": {
+    "less": {
+      "per_anchor_mean": 0.8926915019295921,
+      "per_anchor_std": 0.05165547148908947,
+      "aggregated": 0.9517025106406913,
+      "flops_total": 3463461627494400,
+      "flops_measured": 0,
+      "flops_analytic": 3463461627494400,
+      "flops_per_sample": 4329327034368.0,
+      "inference_time_s": 312.478281447,
+      "load_time_s": 5.079638518000138,
+      "time_per_sample_ms": 390.59785180874997,
+      "n_samples": 800,
+      "cost_notes": [
+        "LESS CudaProjector: 2*264241152*8192*800"
+      ]
+    },
+    "logra_r8": {
+      "per_anchor_mean": 0.8046727051832308,
+      "per_anchor_std": 0.09049111243736407,
+      "aggregated": 0.9080213001331258,
+      "flops_total": 1453326336,
+      "flops_measured": 0,
+      "flops_analytic": 1453326336,
+      "flops_per_sample": 1816657.92,
+      "inference_time_s": 123.04416816899993,
+      "load_time_s": 2.914132118999987,
+      "time_per_sample_ms": 153.8052102112499,
+      "n_samples": 800,
+      "cost_notes": [
+        "logra_fim pinv: 252 blocks x 64^3"
+      ]
+    },
+    "logra_proxy_1.7B": {
+      "per_anchor_mean": 0.4804747762698895,
+      "per_anchor_std": 0.0881933297998572,
+      "aggregated": 0.5782626141413384,
+      "flops_total": 4629974745088,
+      "flops_measured": 0,
+      "flops_analytic": 4629974745088,
+      "flops_per_sample": 5787468431.36,
+      "inference_time_s": 104.88565548400038,
+      "load_time_s": 2.94663198499984,
+      "time_per_sample_ms": 131.10706935500048,
+      "n_samples": 800,
+      "cost_notes": [
+        "logra_fim pinv: 196 blocks x 1024^3"
+      ],
+      "batch_size": 4
+    },
+    "logra_proxy_0.6B": {
+      "per_anchor_mean": 0.21800075922250695,
+      "per_anchor_std": 0.08431253125236252,
+      "aggregated": 0.30464234151463443,
+      "flops_total": 4629974745088,
+      "flops_measured": 0,
+      "flops_analytic": 4629974745088,
+      "flops_per_sample": 5787468431.36,
+      "inference_time_s": 78.43248832100016,
+      "load_time_s": 2.2228904610001337,
+      "time_per_sample_ms": 98.04061040125019,
+      "n_samples": 800,
+      "cost_notes": [
+        "logra_fim pinv: 196 blocks x 1024^3"
+      ],
+      "batch_size": 4
+    },
+    "influcoder_68m": {
+      "per_anchor_mean": 0.16080676609435846,
+      "per_anchor_std": 0.029607996544256898,
+      "aggregated": 0.16758442240264,
+      "flops_total": 0,
+      "flops_measured": 0,
+      "flops_analytic": 0,
+      "flops_per_sample": 0.0,
+      "inference_time_s": 1.9268517949999477,
+      "load_time_s": 1.6711666760002117,
+      "time_per_sample_ms": 2.4085647437499347,
+      "n_samples": 800,
+      "cost_notes": []
+    },
+    "untrained_68m": {
+      "per_anchor_mean": 0.08824729209405367,
+      "per_anchor_std": 0.25059308686203546,
+      "aggregated": 0.17581741135882098,
+      "flops_total": 0,
+      "flops_measured": 0,
+      "flops_analytic": 0,
+      "flops_per_sample": 0.0,
+      "inference_time_s": 1.8956120930001816,
+      "load_time_s": 2.487891369999943,
+      "time_per_sample_ms": 2.369515116250227,
+      "n_samples": 800,
+      "cost_notes": []
+    },
+    "influcoder_150m": {
+      "per_anchor_mean": 0.11310797714701587,
+      "per_anchor_std": 0.024116278532177803,
+      "aggregated": 0.12125888286801793,
+      "flops_total": 0,
+      "flops_measured": 0,
+      "flops_analytic": 0,
+      "flops_per_sample": 0.0,
+      "inference_time_s": 3.332887901000049,
+      "load_time_s": 1.8765572190000057,
+      "time_per_sample_ms": 4.1661098762500615,
+      "n_samples": 800,
+      "cost_notes": []
+    },
+    "untrained_150m": {
+      "per_anchor_mean": 0.1130628616003981,
+      "per_anchor_std": 0.1956053299567496,
+      "aggregated": 0.1576237976487353,
+      "flops_total": 0,
+      "flops_measured": 0,
+      "flops_analytic": 0,
+      "flops_per_sample": 0.0,
+      "inference_time_s": 3.30637577699963,
+      "load_time_s": 2.497611932000382,
+      "time_per_sample_ms": 4.1329697212495375,
+      "n_samples": 800,
+      "cost_notes": []
+    },
+    "influcoder_400m": {
+      "per_anchor_mean": 0.14839374492293778,
+      "per_anchor_std": 0.025013841670712418,
+      "aggregated": 0.15627135169594808,
+      "flops_total": 0,
+      "flops_measured": 0,
+      "flops_analytic": 0,
+      "flops_per_sample": 0.0,
+      "inference_time_s": 6.479870362999918,
+      "load_time_s": 3.9914970390000235,
+      "time_per_sample_ms": 8.099837953749898,
+      "n_samples": 800,
+      "cost_notes": []
+    },
+    "untrained_400m": {
+      "per_anchor_mean": 0.10816207055745734,
+      "per_anchor_std": 0.13771530045398775,
+      "aggregated": 0.14982806844861868,
+      "flops_total": 0,
+      "flops_measured": 0,
+      "flops_analytic": 0,
+      "flops_per_sample": 0.0,
+      "inference_time_s": 6.479280289000144,
+      "load_time_s": 2.744541904000016,
+      "time_per_sample_ms": 8.09910036125018,
+      "n_samples": 800,
+      "cost_notes": []
+    },
+    "rdsplus": {
+      "per_anchor_mean": 0.10811683002302871,
+      "per_anchor_std": 0.12524579728938903,
+      "aggregated": 0.10378733617085106,
+      "flops_total": 0,
+      "flops_measured": 0,
+      "flops_analytic": 0,
+      "flops_per_sample": 0.0,
+      "inference_time_s": 53.91899256500028,
+      "load_time_s": 2.802100422999956,
+      "time_per_sample_ms": 67.39874070625035,
+      "n_samples": 800,
+      "cost_notes": []
+    },
+    "tfidf": {
+      "per_anchor_mean": -0.07974583670837125,
+      "per_anchor_std": 0.08408310765674457,
+      "aggregated": -0.09444471527947049,
+      "flops_total": 0,
+      "flops_measured": 0,
+      "flops_analytic": 0,
+      "flops_per_sample": 0.0,
+      "inference_time_s": 0.15091965000010532,
+      "load_time_s": 2.5469998945482075e-06,
+      "time_per_sample_ms": 0.18864956250013165,
+      "n_samples": 800,
+      "cost_notes": []
+    }
+  }
+}

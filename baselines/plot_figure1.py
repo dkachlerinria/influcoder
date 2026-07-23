@@ -71,6 +71,19 @@ OFFSETS = {
     "untrained_400m": (12, -24, "left"),
     "rdsplus": (10, 20, "left"),
 }
+# dolci-instruct's encoder-cluster scores land much more tightly bunched
+# (agg rho all within ~0.12-0.18, vs. a much wider spread for Dolly) and the
+# trained/untrained ordering even flips at 68m/150m -- OFFSETS above puts
+# labels on top of each other here, so this preset gets its own fan-out.
+OFFSETS_DOLCI = {
+    **OFFSETS,
+    "untrained_68m": (-4, 4, "right"),
+    "influcoder_68m": (-6, -20, "right"),
+    "untrained_150m": (0, 34, "center"),
+    "influcoder_150m": (0, -34, "center"),
+    "influcoder_400m": (6, 22, "left"),
+    "untrained_400m": (6, -16, "left"),
+}
 
 
 def pareto_front(points):
@@ -82,7 +95,7 @@ def pareto_front(points):
     return front
 
 
-def panel(ax, rows, xkey, xlabel, title, tfidf_agg=None, xlim_min=None):
+def panel(ax, rows, xkey, xlabel, title, tfidf_agg=None, xlim_min=None, offsets=OFFSETS):
     xs = [r[xkey] for r in rows if r[xkey] > 0]
     floor = min(xs) / 8 if xs else 1.0
 
@@ -93,7 +106,7 @@ def panel(ax, rows, xkey, xlabel, title, tfidf_agg=None, xlim_min=None):
         face = color if filled else "none"
         ax.scatter(x, r["aggregated"], s=size, color=face, edgecolors=color,
                   linewidths=2.0, zorder=3)
-        dx, dy, ha = OFFSETS.get(r["name"], (9, 5, "left"))
+        dx, dy, ha = offsets.get(r["name"], (9, 5, "left"))
         weight = "bold" if r["name"].startswith("influcoder") else "normal"
         ax.annotate(label, (x, r["aggregated"]), textcoords="offset points",
                    xytext=(dx, dy), ha=ha, fontsize=8.5, color=INK,
@@ -162,8 +175,10 @@ def main():
     fig.patch.set_facecolor("#fcfcfb")
     ax.set_facecolor("#fcfcfb")
 
+    offsets = OFFSETS_DOLCI if data.get("config", {}).get("pool") == "dolci_instruct" else OFFSETS
     panel(ax, rows, "time_per_sample_ms", "inference time per sample, ms (log)",
-         "Selection-time cost vs. ranking quality", tfidf_agg=tfidf_agg, xlim_min=1)
+         "Selection-time cost vs. ranking quality", tfidf_agg=tfidf_agg, xlim_min=1,
+         offsets=offsets)
     ax.set_ylabel("aggregate Spearman $\\rho$ vs. gradient-influence GT",
                   fontsize=10, color=INK)
 
