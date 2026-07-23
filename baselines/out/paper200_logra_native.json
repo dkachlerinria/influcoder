@@ -1,0 +1,32 @@
+{
+  "logra_raw_r4": {
+    "aggregated": 0.25617940448511217,
+    "per_anchor_mean": 0.23483945098627468,
+    "per_anchor_std": 0.11194590478081828
+  },
+  "logra_fim_r4": {
+    "aggregated": 0.4282202055051377,
+    "per_anchor_mean": 0.30651883297082433,
+    "per_anchor_std": 0.07134207999253614
+  },
+  "logra_raw_r8": {
+    "aggregated": 0.5315997899947499,
+    "per_anchor_mean": 0.3937412585314634,
+    "per_anchor_std": 0.10613533416916486
+  },
+  "logra_fim_r8": {
+    "aggregated": 0.6144288607215181,
+    "per_anchor_mean": 0.38721257781444535,
+    "per_anchor_std": 0.08360830736719478
+  },
+  "logra_raw_r16": {
+    "aggregated": 0.6697787444686117,
+    "per_anchor_mean": 0.5297682817070428,
+    "per_anchor_std": 0.10159880388436389
+  },
+  "logra_fim_r16": {
+    "aggregated": 0.6410950273756845,
+    "per_anchor_mean": 0.3919628740718518,
+    "per_anchor_std": 0.08770981782323957
+  }
+}

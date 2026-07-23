@@ -31,7 +31,7 @@ from pathlib import Path
 
 import numpy as np
 
-from influcoder.data import disjoint_splits, load_bbh, load_dolly
+from influcoder.data import disjoint_splits, load_bbh, load_pool
 from influcoder.encoder import distill, embed, load_encoder
 from influcoder.gradients import GradientFeaturizer, hardware_profile, projection_fidelity
 from influcoder.metrics import spearman_metrics
@@ -57,6 +57,55 @@ PRESETS = {
     "big":    dict(n_eval_a=100, n_eval_p=100, n_train_a=500, n_train_p=1000,
                    epochs=8, proj_dim=8192, grad_max_len=1024, check_projection=False,
                    hard_ratio=0.0),
+    # Reproduces the old repo's paper setting (tis-ie
+    # runs/influence_spearman/config_influence_tiny.sh): a 200x200 eval whose
+    # ground truth is deliberately MUCH higher fidelity than the methods scored
+    # against it -- proj_dim 65536 vs LESS/LoGRA at 8192, GT LoRA rank 16 vs
+    # LoGRA rank 8. That fidelity gap is the point: a GT sketched at the same
+    # width as the baseline makes the baseline a near-self-comparison. Intended
+    # with --grad_model HuggingFaceTB/SmolLM2-1.7B and --lora_rank 16.
+    # The train side mirrors `big` so the distilled encoder is trained on
+    # targets from the SAME model the GT comes from. disjoint_splits takes front
+    # slices (eval first), so adding a train side leaves the eval split -- and
+    # the cached GT -- byte-identical.
+    "paper200": dict(n_eval_a=200, n_eval_p=200, n_train_a=500, n_train_p=1000,
+                     epochs=8, proj_dim=65536, grad_max_len=1024,
+                     check_projection=False, hard_ratio=0.0),
+    # The old repo's ACTUAL train-side size: config_influence_tiny.sh overrides
+    # the run_mode defaults with INFLUCODER_N_TRAIN_A=1000 / N_TRAIN_P=2000.
+    # Identical eval to paper200 (front slices), so the cached GT is reused
+    # byte-identical and the two are directly comparable.
+    "paper200x2": dict(n_eval_a=200, n_eval_p=200, n_train_a=1000, n_train_p=2000,
+                       epochs=10, proj_dim=65536, grad_max_len=1024,
+                       check_projection=False, hard_ratio=0.0),
+    # Beyond the old paper's size, exploring whether the data-scaling lever
+    # (the strongest one found post-paper) keeps paying off past 1000x2000.
+    # Same eval/front-slice nesting property as paper200/paper200x2.
+    "paper200x4": dict(n_eval_a=200, n_eval_p=200, n_train_a=2000, n_train_p=4000,
+                       epochs=10, proj_dim=65536, grad_max_len=1024,
+                       check_projection=False, hard_ratio=0.0),
+    # 1000x2000 (paper200x2) beat 2000x4000 (paper200x4) -- an intermediate
+    # size to check whether there's a sweet spot rather than a cliff.
+    "paper200x3": dict(n_eval_a=200, n_eval_p=200, n_train_a=1500, n_train_p=3000,
+                       epochs=10, proj_dim=65536, grad_max_len=1024,
+                       check_projection=False, hard_ratio=0.0),
+    # Figure 1: a bigger (400x400), noise-resistant eval set for the paper's
+    # main speed-vs-quality table. Train side keeps the 1500x3000 size found
+    # to work well during tuning; disjoint_splits' front-slice design means
+    # this train split (anchors[400:1900]) is NOT the same sample set as
+    # paper200x3's (anchors[200:1700]) -- encoders must be retrained under
+    # THIS preset, not reused, or the "eval" set would leak into training.
+    "fig1": dict(n_eval_a=400, n_eval_p=400, n_train_a=1500, n_train_p=3000,
+                epochs=8, proj_dim=65536, grad_max_len=1024,
+                check_projection=False, hard_ratio=0.0),
+    # Same sizes/settings as "fig1", pool swapped for tasksource/dolci-instruct
+    # (prompt/answer pairs, streamed from HF) instead of Dolly -- everything
+    # else (BBH anchors, eval/train sizes, GT model/rank) held fixed so the
+    # two tables are comparable except for the candidate-pool distribution.
+    "fig1_dolci": dict(n_eval_a=400, n_eval_p=400, n_train_a=1500, n_train_p=3000,
+                       epochs=8, proj_dim=65536, grad_max_len=1024,
+                       check_projection=False, hard_ratio=0.0,
+                       pool="dolci_instruct"),
 }
 
 
@@ -90,7 +139,7 @@ def main():
     # -- data ---------------------------------------------------------------
     splits = disjoint_splits(
         load_bbh("data/eval/bbh", seed=42),
-        load_dolly("dolly/dolly_data.jsonl", seed=42),
+        load_pool(cfg.get("pool", "dolly"), seed=42),
         cfg["n_eval_a"], cfg["n_train_a"], cfg["n_eval_p"], cfg["n_train_p"],
     )
     print(f"data: eval {cfg['n_eval_a']}x{cfg['n_eval_p']}, "

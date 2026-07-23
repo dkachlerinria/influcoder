@@ -1,0 +1,255 @@
+{
+  "config": {
+    "preset": "paper200",
+    "gt_shape": [
+      200,
+      200
+    ],
+    "epochs": 8,
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "grad_model": "HuggingFaceTB/SmolLM2-1.7B",
+    "encoder_model": "jhu-clsp/ettin-encoder-68m",
+    "lora_rank": 16,
+    "ratio": "1:2"
+  },
+  "points": [
+    {
+      "n_train_anchors": 25,
+      "n_train_pool": 50,
+      "n_train_pairs": 1250,
+      "agg_mean": 0.30076951923798095,
+      "agg_min": 0.2539938498462462,
+      "agg_max": 0.33725343133578345,
+      "agg_std": 0.0347608944898443,
+      "per_anchor_mean": 0.2205240838924584,
+      "per_anchor_min": 0.19611911666595103,
+      "per_anchor_max": 0.24683850089055093,
+      "untrained_agg_mean": -0.0405715142878572,
+      "runs": [
+        {
+          "seed": 0,
+          "best_epoch": 1,
+          "aggregated": 0.31106127653191334,
+          "per_anchor_mean": 0.21861463412087326,
+          "untrained_aggregated": -0.0405715142878572,
+          "untrained_per_anchor_mean": -0.03576323377965179
+        },
+        {
+          "seed": 1,
+          "best_epoch": 2,
+          "aggregated": 0.33725343133578345,
+          "per_anchor_mean": 0.24683850089055093,
+          "untrained_aggregated": -0.0405715142878572,
+          "untrained_per_anchor_mean": -0.03576323377965179
+        },
+        {
+          "seed": 2,
+          "best_epoch": 4,
+          "aggregated": 0.2539938498462462,
+          "per_anchor_mean": 0.19611911666595103,
+          "untrained_aggregated": -0.0405715142878572,
+          "untrained_per_anchor_mean": -0.03576323377965179
+        }
+      ]
+    },
+    {
+      "n_train_anchors": 50,
+      "n_train_pool": 100,
+      "n_train_pairs": 5000,
+      "agg_mean": 0.33328483212080307,
+      "agg_min": 0.2961299032475812,
+      "agg_max": 0.36409360234005855,
+      "agg_std": 0.02810659941282101,
+      "per_anchor_mean": 0.25233587993495615,
+      "per_anchor_min": 0.235426531135374,
+      "per_anchor_max": 0.2686261833421913,
+      "untrained_agg_mean": -0.0405715142878572,
+      "runs": [
+        {
+          "seed": 0,
+          "best_epoch": 4,
+          "aggregated": 0.2961299032475812,
+          "per_anchor_mean": 0.235426531135374,
+          "untrained_aggregated": -0.0405715142878572,
+          "untrained_per_anchor_mean": -0.03576323377965179
+        },
+        {
+          "seed": 1,
+          "best_epoch": 2,
+          "aggregated": 0.36409360234005855,
+          "per_anchor_mean": 0.2686261833421913,
+          "untrained_aggregated": -0.0405715142878572,
+          "untrained_per_anchor_mean": -0.03576323377965179
+        },
+        {
+          "seed": 2,
+          "best_epoch": 2,
+          "aggregated": 0.3396309907747694,
+          "per_anchor_mean": 0.25295492532730324,
+          "untrained_aggregated": -0.0405715142878572,
+          "untrained_per_anchor_mean": -0.03576323377965179
+        }
+      ]
+    },
+    {
+      "n_train_anchors": 100,
+      "n_train_pool": 200,
+      "n_train_pairs": 20000,
+      "agg_mean": 0.4045911147778695,
+      "agg_min": 0.3993744843621091,
+      "agg_max": 0.40837470936773423,
+      "agg_std": 0.0038114919473171576,
+      "per_anchor_mean": 0.320734581083266,
+      "per_anchor_min": 0.3178290139343158,
+      "per_anchor_max": 0.32221265622716105,
+      "untrained_agg_mean": -0.0405715142878572,
+      "runs": [
+        {
+          "seed": 0,
+          "best_epoch": 6,
+          "aggregated": 0.40837470936773423,
+          "per_anchor_mean": 0.32216207308832123,
+          "untrained_aggregated": -0.0405715142878572,
+          "untrained_per_anchor_mean": -0.03576323377965179
+        },
+        {
+          "seed": 1,
+          "best_epoch": 5,
+          "aggregated": 0.4060241506037651,
+          "per_anchor_mean": 0.32221265622716105,
+          "untrained_aggregated": -0.0405715142878572,
+          "untrained_per_anchor_mean": -0.03576323377965179
+        },
+        {
+          "seed": 2,
+          "best_epoch": 5,
+          "aggregated": 0.3993744843621091,
+          "per_anchor_mean": 0.3178290139343158,
+          "untrained_aggregated": -0.0405715142878572,
+          "untrained_per_anchor_mean": -0.03576323377965179
+        }
+      ]
+    },
+    {
+      "n_train_anchors": 200,
+      "n_train_pool": 400,
+      "n_train_pairs": 80000,
+      "agg_mean": 0.40188654716367916,
+      "agg_min": 0.38299257481437043,
+      "agg_max": 0.4195799894997375,
+      "agg_std": 0.014960852974218857,
+      "per_anchor_mean": 0.32632527152375057,
+      "per_anchor_min": 0.31454184625855025,
+      "per_anchor_max": 0.33922545996987596,
+      "untrained_agg_mean": -0.0405715142878572,
+      "runs": [
+        {
+          "seed": 0,
+          "best_epoch": 4,
+          "aggregated": 0.4030870771769295,
+          "per_anchor_mean": 0.3252085083428255,
+          "untrained_aggregated": -0.0405715142878572,
+          "untrained_per_anchor_mean": -0.03576323377965179
+        },
+        {
+          "seed": 1,
+          "best_epoch": 4,
+          "aggregated": 0.38299257481437043,
+          "per_anchor_mean": 0.31454184625855025,
+          "untrained_aggregated": -0.0405715142878572,
+          "untrained_per_anchor_mean": -0.03576323377965179
+        },
+        {
+          "seed": 2,
+          "best_epoch": 4,
+          "aggregated": 0.4195799894997375,
+          "per_anchor_mean": 0.33922545996987596,
+          "untrained_aggregated": -0.0405715142878572,
+          "untrained_per_anchor_mean": -0.03576323377965179
+        }
+      ]
+    },
+    {
+      "n_train_anchors": 350,
+      "n_train_pool": 700,
+      "n_train_pairs": 245000,
+      "agg_mean": 0.4296827420685518,
+      "agg_min": 0.3898717467936699,
+      "agg_max": 0.4526648166204156,
+      "agg_std": 0.028262482010524823,
+      "per_anchor_mean": 0.3381396369847509,
+      "per_anchor_min": 0.3111437396693692,
+      "per_anchor_max": 0.3548753185787119,
+      "untrained_agg_mean": -0.0405715142878572,
+      "runs": [
+        {
+          "seed": 0,
+          "best_epoch": 0,
+          "aggregated": 0.3898717467936699,
+          "per_anchor_mean": 0.3111437396693692,
+          "untrained_aggregated": -0.0405715142878572,
+          "untrained_per_anchor_mean": -0.03576323377965179
+        },
+        {
+          "seed": 1,
+          "best_epoch": 0,
+          "aggregated": 0.44651166279156984,
+          "per_anchor_mean": 0.34839985270617163,
+          "untrained_aggregated": -0.0405715142878572,
+          "untrained_per_anchor_mean": -0.03576323377965179
+        },
+        {
+          "seed": 2,
+          "best_epoch": 0,
+          "aggregated": 0.4526648166204156,
+          "per_anchor_mean": 0.3548753185787119,
+          "untrained_aggregated": -0.0405715142878572,
+          "untrained_per_anchor_mean": -0.03576323377965179
+        }
+      ]
+    },
+    {
+      "n_train_anchors": 500,
+      "n_train_pool": 1000,
+      "n_train_pairs": 500000,
+      "agg_mean": 0.4421410535263382,
+      "agg_min": 0.4292642316057902,
+      "agg_max": 0.4519012975324384,
+      "agg_std": 0.00950066600698683,
+      "per_anchor_mean": 0.3621370755964723,
+      "per_anchor_min": 0.3518090024899786,
+      "per_anchor_max": 0.36880553233600594,
+      "untrained_agg_mean": -0.0405715142878572,
+      "runs": [
+        {
+          "seed": 0,
+          "best_epoch": 4,
+          "aggregated": 0.4519012975324384,
+          "per_anchor_mean": 0.36579669196343234,
+          "untrained_aggregated": -0.0405715142878572,
+          "untrained_per_anchor_mean": -0.03576323377965179
+        },
+        {
+          "seed": 1,
+          "best_epoch": 4,
+          "aggregated": 0.4292642316057902,
+          "per_anchor_mean": 0.3518090024899786,
+          "untrained_aggregated": -0.0405715142878572,
+          "untrained_per_anchor_mean": -0.03576323377965179
+        },
+        {
+          "seed": 2,
+          "best_epoch": 6,
+          "aggregated": 0.4452576314407861,
+          "per_anchor_mean": 0.36880553233600594,
+          "untrained_aggregated": -0.0405715142878572,
+          "untrained_per_anchor_mean": -0.03576323377965179
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "proxy_1.7B_r16": {
+    "grad_model": "Qwen/Qwen3-1.7B",
+    "rank": 16,
+    "wall_s": 105.0264142010019,
+    "logra_raw": {
+      "aggregated": 0.5031905199407496,
+      "per_anchor_mean": 0.39226621156931196
+    },
+    "logra_fim": {
+      "aggregated": 0.07972774829842685,
+      "per_anchor_mean": 0.05277901816776831
+    }
+  },
+  "proxy_1.7B_r32": {
+    "grad_model": "Qwen/Qwen3-1.7B",
+    "rank": 32,
+    "wall_s": 120.56192004799959,
+    "logra_raw": {
+      "aggregated": 0.5109136932105826,
+      "per_anchor_mean": 0.4335759011769703
+    },
+    "logra_fim": {
+      "aggregated": 0.0834571466071663,
+      "per_anchor_mean": 0.057571483208843616
+    }
+  },
+  "proxy_0.6B_r16": {
+    "grad_model": "Qwen/Qwen3-0.6B",
+    "rank": 16,
+    "wall_s": 93.15812825600005,
+    "logra_raw": {
+      "aggregated": -0.030322689516809477,
+      "per_anchor_mean": -0.014937680251512993
+    },
+    "logra_fim": {
+      "aggregated": 0.061980199876249226,
+      "per_anchor_mean": 0.03179545006546319
+    }
+  },
+  "proxy_0.6B_r32": {
+    "grad_model": "Qwen/Qwen3-0.6B",
+    "rank": 32,
+    "wall_s": 113.58548139200138,
+    "logra_raw": {
+      "aggregated": 0.0302036262726642,
+      "per_anchor_mean": 0.0206768644675355
+    },
+    "logra_fim": {
+      "aggregated": 0.07443571522322014,
+      "per_anchor_mean": 0.05189742046681884
+    }
+  }
+}

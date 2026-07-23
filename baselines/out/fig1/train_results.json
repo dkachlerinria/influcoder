@@ -1,0 +1,29 @@
+{
+  "68m": {
+    "model": "jhu-clsp/ettin-encoder-68m",
+    "encoder_dir": "runs_out/fig1/encoder_68m",
+    "untrained_agg": 0.3863249770311064,
+    "best_epoch": 7,
+    "best_agg": 0.7817638235238968,
+    "best_per_anchor": 0.7582471857528862,
+    "elapsed_s": 125.1
+  },
+  "150m": {
+    "model": "jhu-clsp/ettin-encoder-150m",
+    "encoder_dir": "runs_out/fig1/encoder_150m",
+    "untrained_agg": 0.3304258151613447,
+    "best_epoch": 8,
+    "best_agg": 0.7597676860480377,
+    "best_per_anchor": 0.7350642629064947,
+    "elapsed_s": 222.3
+  },
+  "400m": {
+    "model": "jhu-clsp/ettin-encoder-400m",
+    "encoder_dir": "runs_out/fig1/encoder_400m",
+    "untrained_agg": 0.42960831005193784,
+    "best_epoch": 8,
+    "best_agg": 0.8102319389496183,
+    "best_per_anchor": 0.7868324084586592,
+    "elapsed_s": 493.1
+  }
+}

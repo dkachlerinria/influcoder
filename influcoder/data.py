@@ -71,6 +71,49 @@ def load_dolly(path: Path | str, seed: int) -> list[Sample]:
     return samples
 
 
+def load_dolci_instruct(seed: int, max_docs: int = 6000) -> list[Sample]:
+    """tasksource/dolci-instruct rows (prompt -> answer), seeded shuffle.
+
+    Flat prompt/answer/task schema (no chat-message wrapping like Dolly's
+    JSONL), spread across 8 parquet shards (~1.8M rows total). Streams
+    shards in order and stops once max_docs rows are collected -- same
+    fixed-size, seeded-shuffle contract as load_bbh/load_dolly/load_fineweb,
+    so callers slice front ranges via disjoint_splits regardless of how many
+    they ultimately take.
+    """
+    from datasets import load_dataset
+
+    samples = []
+    for shard in range(8):
+        if len(samples) >= max_docs:
+            break
+        ds = load_dataset("tasksource/dolci-instruct",
+                          data_files=f"data/train-{shard:05d}-of-00008.parquet",
+                          split="train", streaming=True)
+        for row in ds:
+            prompt = row["prompt"].strip()
+            answer = row["answer"].strip()
+            if prompt and answer:
+                samples.append(Sample(
+                    context=f"<|user|>\n{prompt}\n<|assistant|>\n",
+                    target=answer,
+                    text=f"{prompt}\n{answer}",
+                ))
+                if len(samples) >= max_docs:
+                    break
+    random.Random(seed).shuffle(samples)
+    return samples
+
+
+def load_pool(name: str, seed: int) -> list[Sample]:
+    """Dispatch to the pool/candidate loader selected by a preset's `pool` key."""
+    if name == "dolly":
+        return load_dolly("dolly/dolly_data.jsonl", seed=seed)
+    if name == "dolci_instruct":
+        return load_dolci_instruct(seed=seed)
+    raise ValueError(f"unknown pool: {name}")
+
+
 def load_fineweb(seed: int, max_docs: int = 600, min_chars: int = 800,
                  max_chars: int = 2000, split_frac: float = 0.6) -> list[Sample]:
     """FineWeb web-text documents, reduced to (context, target) via a
