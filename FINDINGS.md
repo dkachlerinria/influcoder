@@ -55,29 +55,110 @@ line. This is the shareable summary; per-run detail (every tuning round, every b
 
 ## InfluCoder training-tuning (13 rounds on Qwen3-4B GT, condensed)
 
-- **The one big lever is train size, and it needs hard-negative mining to scale with it.** 500x1000 →
-  1000x2000 was the single largest single-variable gain found (+0.052, >10x the next-best lever).
-  1000x2000 and 1500x3000 land in the same ~0.76-0.77 band once seed noise is accounted for (2-seed
-  means agree); 2000x4000 *regresses* unless hard_ratio also scales up (random negatives get diluted as
-  pool size grows past ~a few dozen candidates).
-- **Hard-negative mining has an interior optimum that shifts with pool size**, and is a hard cliff at
-  the top: ratio=1.0 (pure hard negatives, no easy contrast left to calibrate against) collapses training
-  to +0.47, far below every other config tested. At 1000x2000/1500x3000 the peak is ~0.5-0.7; at 2000x4000
-  it needs ~0.75+.
-- **Encoder size "bigger is worse" was a data-starvation artifact, not a real capacity finding.** At
-  500x1000/no hard mining, 150m/400m were both worse than 68m (400m collapsed within 1 epoch). An LR-
-  mismatch theory was tested and refuted (lower LR "fixed" 400m's instability but didn't make it
-  competitive); more data did — at 1500x3000, 400m becomes the single best config found all session
-  (+0.802 at 8 epochs, +0.802→+0.8017 clean gain from 16 epochs, ruled noise-sized and not adopted).
-- **Everything else tested was flat-to-negative and not pursued:** grad_accum (1→4), cosine LR schedule,
-  weight_decay=0, tighter grad-clip, m_candidates/k_anchors scaled up, and most single-variable LR/temp
-  sweeps around the found optima. Alpha (listwise-KL vs. Pearson blend) has a small (~0.01-0.02, noise-
-  adjacent) interior optimum around 0.2-0.3, replicated in direction (not magnitude) across 68m and 400m.
-- **Ensembling reduces variance, it doesn't raise the ceiling.** 3-seed score-averaging beat the solo mean
-  by +0.0098 but did not beat the single best individual seed.
-- **Reference config at pause: 400m encoder, 1500x3000 train, lr=5e-5, epochs=8, hard_ratio=0,
-  alpha=0.3 → agg ~+0.796-0.798.** Gap to the LoGRA r8/4B target (+0.8231, 5-draw mean): **~-0.025 to
-  -0.027**, the closest result reached. Paused (not abandoned) to build Figure 1.
+**Reference config at pause: 400m encoder, 1500x3000 train (`paper200x3`), lr=5e-5, epochs=8,
+hard_ratio=0, alpha=0.3 → agg ~+0.796-0.798.** Gap to the LoGRA r8/4B target (+0.8231, 5-draw mean):
+**~-0.025 to -0.027**, the closest result reached. Paused (not abandoned) to build Figure 1. Below is
+every axis that was actually swept, split into what helped, what didn't, and what values to start from.
+
+### What works / good starting values
+
+- **Train size 1000x2000 to 1500x3000** (`paper200x2`/`paper200x3`) is the single biggest lever found —
+  500x1000→1000x2000 alone was +0.052, more than 10x every other individual lever. 1000x2000 and
+  1500x3000 are statistically tied once seed noise is accounted for (2-seed means: +0.7659 vs. +0.7667,
+  std ~0.01) — either is a safe default; **don't bother chasing 2000x4000+** (see below).
+- **Hard-negative mining (`hard_ratio`) genuinely helps, but only once there's enough data.** It *hurt*
+  at 500x1000 (both flat 0.5 and a 0.0→0.5 curriculum ramp lost to hard_ratio=0), but at 1000x2000+ it's
+  a real, repeatable +0.005 to +0.02 win. **Rule of thumb: hard_ratio ≈ 0.5-0.6 at 1000x2000-1500x3000,
+  climbing toward ~0.75 at 2000x4000** — the right ratio scales up with pool size, because a bigger
+  pool needs more hard fraction before the negatives are diluted back down to "all easy."
+- **Bigger encoders (150m, 400m) are viable and can win — but only with enough data.** At 1500x3000, 400m
+  with **lr=5e-5 (the same LR that's default for 68m!) and no hard mining** hit **+0.7960**, the best
+  single InfluCoder config found this session; extending to 16 epochs nudged it to +0.8017 (judged
+  within noise, not worth the 2x compute — see below). 68m remains the safe default at smaller data
+  scales (≤500x1000) or when compute is the binding constraint (68m trains ~10-40x faster than 400m for
+  a result in the same ballpark once data is adequate).
+- **Alpha (listwise-KL weight vs. global-Pearson weight) has a small, real, direction-consistent optimum
+  around 0.2-0.3** (default is 0.5). Effect size is small (~0.01-0.02, close to the seed-noise floor) but
+  the *direction* — lower alpha (more listwise KL, less Pearson) is better — replicated across both 68m
+  and 400m, and across a full 0.0→0.7 sweep (0.0 and 1.0-ish extremes are worse than the 0.2-0.3 interior,
+  so it's a real interior optimum, not a monotonic "always lower" trend).
+- **Defaults for everything else are already good**: `lr=5e-5`, `weight_decay=0.01`, `max_grad_norm=1.0`,
+  `temperature=0.05`, `m_candidates=16`, `k_anchors=8`, `grad_accum_steps=1`, linear LR decay, `epochs=8`
+  — every deviation tried from these (see below) was flat-to-negative. If you're setting up a new sweep,
+  start here rather than re-testing these axes from scratch.
+
+### What doesn't work (tested and rejected — don't re-run these)
+
+- **`grad_accum_steps` 1→4**: no benefit, tested on 68m (-0.018) *and* 400m (-0.031). Smooths the loss
+  curve visually but never improves the eval number. Dead lever regardless of encoder size.
+- **Bigger batch composition (`m_candidates` 16→24/32, `k_anchors` 8→12/16)**: consistently worse.
+  m_candidates=24 was the single worst regression found on that axis (-0.044); m_candidates=32 recovered
+  partway but still lost to 16; k_anchors=12/16 lost by -0.03 to -0.033. More candidates/anchors per
+  step dilutes the loss with more easy negatives — the opposite of what "more compute per step" should
+  buy. Confirmed on both 68m and 400m.
+- **Cosine LR schedule**: worse than linear decay (-0.018) at this epoch budget. Not revisited.
+- **LR off 5e-5 in either direction**: 2e-5 (-0.02), 1e-4 (worse, though "still rising at epoch 8" so not
+  fully conclusive), and for 400m specifically 3e-5 (-0.01) and 2e-5 (-0.023, though this was *before* the
+  data-scale explanation was found — see below). 5e-5 wins every head-to-head run.
+- **Temperature off 0.05 in either direction**: 0.02 (sharper, -0.005) and 0.10 (softer, -0.01) both
+  lose. Local optimum confirmed, not pursued further.
+- **`weight_decay=0`** (-0.016) and **`max_grad_norm=0.5`** (-0.009): both worse than the defaults.
+- **More epochs almost never helps, and can actively hurt.** 68m: 8→16 epochs at 500x1000 bought
+  *nothing* (peaks by epoch 4-5 regardless, then just overfits from the same-ish checkpoint) — epoch
+  budget is not the bottleneck for 68m. 400m: 8→16 epochs at 1500x3000 gained +0.0057, judged noise-sized
+  and **not worth 2x the compute** — standardized on 8 epochs.
+- **Pure hard negatives (`hard_ratio=1.0`) is a hard cliff, not a graceful falloff.** Collapses to +0.474
+  — far below hard_ratio=0.75's +0.769 at the same pool size. With every candidate near-maximally similar
+  to the anchor, there's no easy contrast left for the ranking loss to calibrate against and the signal
+  degenerates. Never use ratio=1.0 at any pool size.
+- **More data alone, without proportionally more hard mining, regresses.** 2000x4000 (`big4x`) at
+  hard_ratio=0 scored *worse* (+0.750) than 1000x2000 at hard_ratio=0 (+0.765) — bigger pool dilutes
+  random negatives faster than it adds signal. Fixed by raising hard_ratio in step (see above), but
+  data size alone past ~1500x3000 is not a free lunch.
+- **The original "150m/400m are worse than 68m" conclusion was real at small data but wrong in general** —
+  don't cite it standalone. At 500x1000/no-hard-mining both bigger encoders lost (150m -0.042, 400m
+  collapsed within 1 epoch, -0.095 by final epoch). A learning-rate-mismatch theory was tested (lower LR
+  for 400m) and *did* fix the instability (lr=1e-5 → smooth curve, +0.7385) but still didn't make it
+  competitive; only adding data (1500x3000) actually closed the gap, and at that point the **original**
+  LR (5e-5) turned out best after all (+0.796 beats lr=2e-5's +0.7735) — the two-step "wrong theory, then
+  right one" is worth remembering before re-deriving it.
+- **Ensembling (multi-seed score averaging) reduces variance, it does not raise the ceiling.** 3-seed
+  average (+0.7781) beat the solo mean (+0.7683, seeds 0.7643/0.7582/0.7825) by only +0.0098, and did
+  *not* beat the single best individual seed (+0.7825). Use it only if you specifically need a
+  lower-variance estimate, not as a way to systematically beat your best single run.
+- **LoGRA's FIM-preconditioned variant is much worse than raw at every rank and every proxy tested**
+  (e.g. 1.7B r16: raw +0.50 vs. fim +0.08) — never the safe default choice it sounds like; use raw.
+- **Batching LoGRA (`batch_size`>1)** gives a real 7-18% speedup where it fits, but silently corrupts the
+  per-sample gradient (verified score drift up to 0.126) — see Core section. Not a free win, don't adopt
+  it without explicitly flagging the tradeoff.
+
+## Time / compute savers
+
+- **Cache GT + train-side gradient features once, reuse across every encoder size.** Only the encoder
+  differs across the 68m/150m/400m sweep — `train_fig1_encoders.py` pays the Qwen3-4B featurization cost
+  (the expensive part, ~15min) exactly once and shares it. Once cached, a same-size hyperparameter run at
+  500x1000/8 epochs is ~60s. Only *changing train size* pays the featurization cost again — batch same-size
+  sweeps together.
+- **Skip FLOPs measurement unless you specifically need a camera-ready appendix.** `FlopCounterMode`
+  roughly 5x's wall-clock just for instrumentation, and every time it was checked it told the exact same
+  ranking story ms/sample already tells. `figure1_table.run_row` defaults to `measure_flops=False` for
+  this reason — leave it off.
+- **Don't over-rank the LoGRA proxies past r16.** 1.7B plateaus by r16 (r16 +0.5032 vs. r32 +0.5109 — a
+  wash); 0.6B never benefits from rank at all (stuck near zero r8 through r32). Raising rank costs nothing
+  in *speed* (rank is ~0.02% of FLOPs) but there's no quality reason to go past r16 for 1.7B and no reason
+  to raise rank for 0.6B at all.
+- **Don't re-draw more LoGRA seeds for the target.** The existing 5-draw estimate (mean +0.8231, std
+  0.087) already clears the "~3 seeds for a variance reading" bar; further seeds are not planned unless
+  something about the target itself looks wrong. Put compute into InfluCoder training instead.
+- **Don't retest grad_accum, wider batch composition (m_candidates/k_anchors), or weight_decay/grad_clip
+  deviations** — all confirmed dead levers (see above) on two different encoder sizes each. Skip them in
+  future sweeps rather than re-verifying.
+- **Beware same-process sequential reloads when timing multiple configs** — an apparent 38% rank-4-vs-8
+  LoGRA timing gap was actually ~95s of OS-page-cache-cold-load I/O on the *first* config only; a clean
+  comparison needs either fresh processes per config or an explicit cache-warming pass before timing.
+- **SDPA + batch_size=1 is now the default and doesn't need re-verifying per run** — already confirmed
+  safe (Δagg = +0.0046 vs. eager) and adopted; re-timing already-adopted rows isn't necessary unless the
+  underlying model/rank changes.
 
 ## Pool swap: Dolly → tasksource/dolci-instruct (everything else held fixed)
 
