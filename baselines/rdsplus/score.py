@@ -31,14 +31,15 @@ def _weighted_mean_embeds(model, dataloader, device) -> torch.Tensor:
 
 
 def score_rdsplus(splits, model_name: str, max_len: int = 1024,
-                  batch_size: int = 1, meter=None) -> torch.Tensor:
+                  batch_size: int = 1, attn_implementation: str = "eager",
+                  meter=None) -> torch.Tensor:
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
     tok = AutoTokenizer.from_pretrained(model_name)
     if tok.pad_token is None:
         tok.pad_token = tok.eos_token
     model = AutoModelForCausalLM.from_pretrained(
-        model_name, torch_dtype=torch.bfloat16, attn_implementation="eager")
+        model_name, torch_dtype=torch.bfloat16, attn_implementation=attn_implementation)
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model.to(device).eval()
     if meter is not None:

@@ -32,13 +32,17 @@ def load_base_with_fresh_lora(
     lora_dropout: float = 0.1,
     seed: int = 0,
     torch_dtype: Any = torch.bfloat16,
+    gradient_checkpointing: bool = False,
+    attn_implementation: str = "eager",
 ) -> PeftModel:
-    # attn_implementation="eager" pinned for FLOP-measurement reproducibility
-    # AND because torch.utils.flop_counter's SDPA handler crashes on GQA models
-    # (asserts Q/K/V have equal head counts; Qwen3 etc. have fewer K/V heads).
-    # See KNOWN_ISSUES.txt for details.
+    # attn_implementation defaults to "eager", historically pinned for FLOP-
+    # measurement reproducibility AND because torch.utils.flop_counter's SDPA
+    # handler crashes on GQA models (asserts Q/K/V have equal head counts;
+    # Qwen3 etc. have fewer K/V heads). See KNOWN_ISSUES.txt for details. Only
+    # matters when wrapping calls in baselines.cost.flop_counter() -- callers
+    # doing plain wall-clock timing are free to pass "sdpa".
     base_model = AutoModelForCausalLM.from_pretrained(
-        model_name, torch_dtype=torch_dtype, attn_implementation="eager"
+        model_name, torch_dtype=torch_dtype, attn_implementation=attn_implementation
     )
     base_model.to("cuda")
 
@@ -57,6 +61,18 @@ def load_base_with_fresh_lora(
         bias="none",
     )
     model = get_peft_model(base_model, peft_config)
+
+    if gradient_checkpointing:
+        # Trades compute for memory (recomputes forward activations during
+        # backward instead of storing them) -- same loss, same gradients,
+        # just lower peak activation memory. enable_input_require_grads() is
+        # required with a frozen base + LoRA: checkpointing's recompute trick
+        # needs the checkpoint's input tensor to require grad, but the base
+        # model's embeddings output doesn't by default when only LoRA params
+        # are trainable.
+        model.gradient_checkpointing_enable()
+        model.enable_input_require_grads()
+        model.config.use_cache = False
 
     trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
     total = sum(p.numel() for p in model.parameters())

@@ -52,6 +52,19 @@ line. This is the shareable summary; per-run detail (every tuning round, every b
      indexing site — fixed with explicit `dtype=torch.long`.
 - **General lesson:** sequential same-process model reloads across configs confound wall-clock timing via
   OS page-cache warmup — a clean cost comparison needs fresh processes or an explicit cache-warm step.
+- **InfluCoder vs. untrained-encoder timing is confounded by CUDA kernel/SDPA-path warm-up, not just OS
+  page cache.** `influcoder_*` and `untrained_*` are the SAME architecture (only weights differ), so
+  whichever one is scored FIRST in a process eats the first-call CUDA kernel/SDPA-path compilation cost
+  inside its measured *inference* time (`CostMeter.model_ready()` only excludes model loading, not
+  first-forward-pass warm-up) — e.g. one draft run measured influcoder_68m at 99.75ms/sample vs.
+  untrained_68m at 5.73ms (17x), which flipped to untrained being the slow one when scoring order was
+  reversed. Fixed by adding a one-sample throwaway `model.encode(...)` call right after `model.to("cuda")`
+  and before `meter.model_ready()` in both `baselines/semantic/score.py` and
+  `baselines/influcoder/score.py` — folds the warm-up cost into (excluded) load time instead of (measured)
+  inference time. Post-fix: influcoder_68m dropped to ~10ms/sample, much closer to untrained's 5.75ms.
+  A residual ~4x gap remained at 150m even after the fix (smaller than before, not fully explained —
+  possibly warm-up specific to the real batch shape (32) vs. the single-sample warmup call, or tokenizer-
+  side) — not yet root-caused.
 
 ## InfluCoder training-tuning (13 rounds on Qwen3-4B GT, condensed)
 
@@ -178,6 +191,39 @@ every axis that was actually swept, split into what helped, what didn't, and wha
 - **Secondary pool-swap effects:** both LoGRA proxies transfer *better* on dolci-instruct than Dolly
   (0.6B +0.03→+0.30, 1.7B +0.51→+0.58). TF-IDF goes **negative** (+0.30→-0.09) — lexical overlap is a much
   weaker influence signal on this heterogeneous pool. RDS+ drops (+0.31→+0.10).
+
+## InfluCoder training-sample scaling (EXP1 figure, Part 2)
+
+- **Distillation quality scales smoothly with training-sample count, fixed 1:2
+  anchor:pool ratio, same recipe as `train_fig1_encoders.py`'s `fig1_dolci` config (68m
+  encoder, epochs=8, hard_ratio=0, encoder_max_len=1024).** On the full 400x400 eval:
+  agg ρ rises from +0.49 (n=75 total) to +0.77 (n=4500 total, `fig1_dolci`'s own full
+  train size), monotonically, with diminishing returns past ~750-1000 anchors (the last
+  doubling, 750→1500 anchors, buys only +0.023 vs. +0.10 for 100→250). Untrained-encoder
+  baseline on this same 400x400 eval is +0.3171 (a different number from the 50x50-slice
+  untrained_68m of +0.2074 in the Part-1 table above — expected, different eval size, not
+  a bug). Full point table in `EXP1.md` §7's Part 2 subsection.
+- **Report the fixed last epoch, not the internally-selected best epoch, when the x-axis
+  is "how much data."** `distill()`'s own best-epoch restoration (`select_best_on`) exists
+  because eval Spearman is noisy and peaks-then-degrades at small sample counts — good for
+  reporting a single config's best achievable score, wrong for a scaling curve, where an
+  early best-epoch pick at small n confounds "how much data helps" with "how much
+  early-stopping helps." Fix used: read `log["epoch_metrics"][-1]` (the metrics recorded
+  at the end of the final epoch, before `distill()`'s internal restore runs) instead of
+  `log["epoch_metrics"][log["best_epoch"]]` — no change to `distill()` itself needed, this
+  is purely how the caller reads its return value.
+- **Open, unresolved discrepancy:** `baselines/out/fig1_dolci/table1.json` (a pre-existing,
+  already-committed file from an earlier project stage, NOT from this session) has
+  `influcoder_68m` aggregated = **+0.0466** — inconsistent with this session's scaling
+  sweep's n_a=1500 result of **+0.7676** for what should be a comparable/larger training
+  config on dolci-instruct. This is very likely the same result behind the
+  `dolci-non-reproduction` memory ("InfluCoder hit ~+0.78 where the docs record a ~+0.05
+  collapse, on identical code") — i.e. `table1.json` may be the actual source of that
+  older collapse finding, produced under some different (unrecorded) condition. Don't
+  trust `table1.json`'s other rows (e.g. its LoGRA numbers) as automatically comparable to
+  this session's pipeline just because they're at the same 400x400 eval size — the
+  internal inconsistency suggests the run that produced the whole file differs from the
+  current known-good code path in some unidentified way.
 
 ## Why this session's full-vs-proxy LoGRA gap looks smaller than the original paper's
 

@@ -1,0 +1,50 @@
+{
+  "rows": {
+    "Qwen3-4B_bs1": {
+      "ms_per_sample": 421.602900052676,
+      "peak_gb": 14.608634368,
+      "model": "Qwen/Qwen3-4B",
+      "batch_size": 1
+    },
+    "Qwen3-4B_bs2": {
+      "ms_per_sample": 389.07894565636525,
+      "peak_gb": 20.755041792,
+      "model": "Qwen/Qwen3-4B",
+      "batch_size": 2
+    },
+    "Qwen3-1.7B_bs1": {
+      "ms_per_sample": 208.29997380254403,
+      "peak_gb": 7.586947072,
+      "model": "Qwen/Qwen3-1.7B",
+      "batch_size": 1
+    },
+    "Qwen3-1.7B_bs2": {
+      "ms_per_sample": 190.56423710450568,
+      "peak_gb": 11.695473152,
+      "model": "Qwen/Qwen3-1.7B",
+      "batch_size": 2
+    },
+    "Qwen3-1.7B_bs4": {
+      "ms_per_sample": 184.21939839511955,
+      "peak_gb": 19.90518528,
+      "model": "Qwen/Qwen3-1.7B",
+      "batch_size": 4
+    }
+  },
+  "best": {
+    "Qwen/Qwen3-4B": {
+      "ms_per_sample": 389.07894565636525,
+      "peak_gb": 20.755041792,
+      "model": "Qwen/Qwen3-4B",
+      "batch_size": 2
+    },
+    "Qwen/Qwen3-1.7B": {
+      "ms_per_sample": 184.21939839511955,
+      "peak_gb": 19.90518528,
+      "model": "Qwen/Qwen3-1.7B",
+      "batch_size": 4
+    }
+  },
+  "seq_len": 1024,
+  "rank": 8
+}

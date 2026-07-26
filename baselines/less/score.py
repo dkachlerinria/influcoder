@@ -23,7 +23,8 @@ from baselines.less.model_utils import load_base_with_fresh_lora
 
 def score_less(splits, model_name: str, proj_dim: int = 8192, max_len: int = 1024,
                lora_rank: int = 128, lora_alpha: int = 512, lora_dropout: float = 0.1,
-               lora_seed: int = 0, project_interval: int = 8,
+               lora_seed: int = 0, project_interval: int = 8, block_size: int = 128,
+               gradient_checkpointing: bool = False, attn_implementation: str = "eager",
                meter=None) -> torch.Tensor:
     from transformers import AutoTokenizer
 
@@ -34,7 +35,8 @@ def score_less(splits, model_name: str, proj_dim: int = 8192, max_len: int = 102
     model = load_base_with_fresh_lora(
         model_name=model_name, tokenizer=tok, lora_target_modules="all-linear",
         lora_rank=lora_rank, lora_alpha=lora_alpha, lora_dropout=lora_dropout,
-        seed=lora_seed,
+        seed=lora_seed, gradient_checkpointing=gradient_checkpointing,
+        attn_implementation=attn_implementation,
     )
     if meter is not None:
         meter.model_ready()
@@ -47,7 +49,8 @@ def score_less(splits, model_name: str, proj_dim: int = 8192, max_len: int = 102
             tokenized_dataset(tok, samples, max_len), batch_size=1, shuffle=False)
         g, uses_custom_cuda = collect_grads(
             dl, model, proj_dim=proj_dim, adam_optimizer_state=None,
-            gradient_type="sgd", project_interval=project_interval)
+            gradient_type="sgd", project_interval=project_interval,
+            block_size=block_size)
         used_cuda_proj = uses_custom_cuda
         return normalize_embeddings_in_chunks(g, chunk_size=10000, dim=1,
                                               eps=1e-12, in_place=False)

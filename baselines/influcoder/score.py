@@ -21,7 +21,8 @@ import torch.nn.functional as F
 
 
 def score_influcoder(splits, encoder_dir: str, max_len: int = 512,
-                     batch_size: int = 32, meter=None) -> torch.Tensor:
+                     batch_size: int = 32, attn_implementation: str = "eager",
+                     meter=None) -> torch.Tensor:
     from sentence_transformers import SentenceTransformer
 
     path = Path(encoder_dir)
@@ -32,10 +33,15 @@ def score_influcoder(splits, encoder_dir: str, max_len: int = 512,
         )
 
     model = SentenceTransformer(str(path),
-                                model_kwargs={"attn_implementation": "eager"})
+                                model_kwargs={"attn_implementation": attn_implementation})
     model.max_seq_length = max_len
     if torch.cuda.is_available():
         model.to("cuda")
+    # Throwaway forward pass to force CUDA kernel/SDPA-path compilation before
+    # timing starts -- see baselines/semantic/score.py for why this matters:
+    # without it, whichever model of a given architecture runs FIRST in the
+    # process eats that one-time cost inside its measured "inference" time.
+    model.encode(["warmup"], batch_size=1, show_progress_bar=False)
     if meter is not None:
         meter.model_ready()
 

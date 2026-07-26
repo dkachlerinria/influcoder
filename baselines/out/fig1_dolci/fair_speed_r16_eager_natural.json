@@ -1,0 +1,50 @@
+{
+  "rows": {
+    "eager/natural": {
+      "Qwen3-4B_r8_bs1": {
+        "ms_per_sample": 403.85645534358144,
+        "peak_gb": 21.928476672,
+        "model": "Qwen/Qwen3-4B",
+        "rank": 8,
+        "batch_size": 1
+      },
+      "Qwen3-1.7B_r16_bs1": {
+        "ms_per_sample": 235.72045113542117,
+        "peak_gb": 10.447410688,
+        "model": "Qwen/Qwen3-1.7B",
+        "rank": 16,
+        "batch_size": 1
+      },
+      "Qwen3-1.7B_r16_bs2": {
+        "ms_per_sample": 192.4314711044038,
+        "peak_gb": 17.375960576,
+        "model": "Qwen/Qwen3-1.7B",
+        "rank": 16,
+        "batch_size": 2
+      }
+    }
+  },
+  "best": {
+    "eager/natural": {
+      "Qwen/Qwen3-4B": {
+        "ms_per_sample": 403.85645534358144,
+        "peak_gb": 21.928476672,
+        "model": "Qwen/Qwen3-4B",
+        "rank": 8,
+        "batch_size": 1
+      },
+      "Qwen/Qwen3-1.7B": {
+        "ms_per_sample": 192.4314711044038,
+        "peak_gb": 17.375960576,
+        "model": "Qwen/Qwen3-1.7B",
+        "rank": 16,
+        "batch_size": 2
+      }
+    }
+  },
+  "seq_len": 1024,
+  "ranks": {
+    "Qwen/Qwen3-4B": 8,
+    "Qwen/Qwen3-1.7B": 16
+  }
+}

@@ -5,22 +5,29 @@ what's free before reserving. Written for an agent driving this over SSH non-int
 
 ## Rules (read before reserving anything)
 
-1. **⚠️⚠️⚠️ ALWAYS REQUEST EXACTLY 1 GPU. NEVER THE WHOLE NODE. ⚠️⚠️⚠️**
+1. **⚠️⚠️⚠️ ALWAYS REQUEST EXACTLY 1 GPU PER JOB. NEVER THE WHOLE NODE. ⚠️⚠️⚠️**
    Every `oarsub` **must** use `-l gpu=1,...` and nothing broader (no `-l
    nodes=1`, no whole-node `host=...` selection, no requesting all GPUs on a
    cluster's nodes). This holds even though most G5K GPU nodes have 2+ GPUs —
    grabbing the whole node to get "your" GPU wastes the others and blocks
-   anyone else from using them. Never hold more than one active GPU-bearing job
-   across all sites at once, either. If `oarsub`/`ssh` output ever *suggests*
+   anyone else from using them. If `oarsub`/`ssh` output ever *suggests*
    reserving the whole node as a fix for something (e.g. the "not all its CPU
    cores are assigned" error when plain-`ssh`ing to a node — see "Running Claude
    Code" below) — **that is not a valid option here.** The fix is always
    `oarsh`, never a bigger reservation.
+   **Multiple concurrent GPU jobs across sites are explicitly allowed** (each
+   still `gpu=1`) — e.g. running an independent quick probe on a second
+   reservation while a longer measurement is still in progress on the first.
+   Just track each job's id/site/node separately so polling and cleanup don't
+   get crossed.
 2. **Check for existing runs before submitting a new job.** Loop `oarstat -u dkachler`
    across every site (see "Checking your own running jobs" below) *first*. If
-   anything is already `Running` or `Waiting` and holds a GPU, **stop and tell the
+   anything is already `Running` or `Waiting` and holds a GPU that you don't
+   recognize as one of your own in-progress tasks, **stop and tell the
    user** — don't submit on top of it. Do not assume a job you don't remember
    submitting is stale; it may be a manual session the user started themselves.
+   (This is about not colliding with unknown/foreign jobs, not a cap on how
+   many jobs you yourself may hold — see rule 1.)
 3. **When checking for free GPUs to reserve, prioritize >=40GB models** (A100-40GB,
    A100-80GB, L40S, A40, MI210, RTX 8000/6000 Ada, GH200, etc.) over smaller cards
    (RTX 2080 Ti, T4, GTX-series) unless the user says otherwise. See the scan

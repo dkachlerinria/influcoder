@@ -1,0 +1,168 @@
+{
+  "rows": {
+    "sdpa/fixed": {
+      "Qwen3-4B_bs1": {
+        "ms_per_sample": 414.49743080253637,
+        "peak_gb": 14.608634368,
+        "model": "Qwen/Qwen3-4B",
+        "batch_size": 1
+      },
+      "Qwen3-4B_bs2": {
+        "ms_per_sample": 381.97799087599077,
+        "peak_gb": 20.755041792,
+        "model": "Qwen/Qwen3-4B",
+        "batch_size": 2
+      },
+      "Qwen3-1.7B_bs1": {
+        "ms_per_sample": 204.57275398924443,
+        "peak_gb": 7.586947072,
+        "model": "Qwen/Qwen3-1.7B",
+        "batch_size": 1
+      },
+      "Qwen3-1.7B_bs2": {
+        "ms_per_sample": 188.75933134404477,
+        "peak_gb": 11.695473152,
+        "model": "Qwen/Qwen3-1.7B",
+        "batch_size": 2
+      },
+      "Qwen3-1.7B_bs4": {
+        "ms_per_sample": 181.56135689544803,
+        "peak_gb": 19.90518528,
+        "model": "Qwen/Qwen3-1.7B",
+        "batch_size": 4
+      }
+    },
+    "sdpa/natural": {
+      "Qwen3-4B_bs1": {
+        "ms_per_sample": 323.08215464581735,
+        "peak_gb": 14.488211456,
+        "model": "Qwen/Qwen3-4B",
+        "batch_size": 1
+      },
+      "Qwen3-4B_bs2": {
+        "ms_per_sample": 305.72523499965126,
+        "peak_gb": 20.755041792,
+        "model": "Qwen/Qwen3-4B",
+        "batch_size": 2
+      },
+      "Qwen3-1.7B_bs1": {
+        "ms_per_sample": 197.9154492910311,
+        "peak_gb": 7.585374208,
+        "model": "Qwen/Qwen3-1.7B",
+        "batch_size": 1
+      },
+      "Qwen3-1.7B_bs2": {
+        "ms_per_sample": 153.74378031143956,
+        "peak_gb": 11.695473152,
+        "model": "Qwen/Qwen3-1.7B",
+        "batch_size": 2
+      },
+      "Qwen3-1.7B_bs4": {
+        "ms_per_sample": 160.58684512487767,
+        "peak_gb": 19.90518528,
+        "model": "Qwen/Qwen3-1.7B",
+        "batch_size": 4
+      }
+    },
+    "eager/fixed": {
+      "Qwen3-4B_bs1": {
+        "ms_per_sample": 570.0649532191164,
+        "peak_gb": 21.813494272,
+        "model": "Qwen/Qwen3-4B",
+        "batch_size": 1
+      },
+      "Qwen3-1.7B_bs1": {
+        "ms_per_sample": 256.89762758338475,
+        "peak_gb": 10.40365568,
+        "model": "Qwen/Qwen3-1.7B",
+        "batch_size": 1
+      },
+      "Qwen3-1.7B_bs2": {
+        "ms_per_sample": 246.9837493117666,
+        "peak_gb": 17.32891904,
+        "model": "Qwen/Qwen3-1.7B",
+        "batch_size": 2
+      }
+    },
+    "eager/natural": {
+      "Qwen3-4B_bs1": {
+        "ms_per_sample": 399.13888132286957,
+        "peak_gb": 21.934768128,
+        "model": "Qwen/Qwen3-4B",
+        "batch_size": 1
+      },
+      "Qwen3-1.7B_bs1": {
+        "ms_per_sample": 227.4529115408465,
+        "peak_gb": 10.40365568,
+        "model": "Qwen/Qwen3-1.7B",
+        "batch_size": 1
+      },
+      "Qwen3-1.7B_bs2": {
+        "ms_per_sample": 191.59798229156877,
+        "peak_gb": 17.32891904,
+        "model": "Qwen/Qwen3-1.7B",
+        "batch_size": 2
+      }
+    }
+  },
+  "best": {
+    "sdpa/fixed": {
+      "Qwen/Qwen3-4B": {
+        "ms_per_sample": 381.97799087599077,
+        "peak_gb": 20.755041792,
+        "model": "Qwen/Qwen3-4B",
+        "batch_size": 2
+      },
+      "Qwen/Qwen3-1.7B": {
+        "ms_per_sample": 181.56135689544803,
+        "peak_gb": 19.90518528,
+        "model": "Qwen/Qwen3-1.7B",
+        "batch_size": 4
+      }
+    },
+    "sdpa/natural": {
+      "Qwen/Qwen3-4B": {
+        "ms_per_sample": 305.72523499965126,
+        "peak_gb": 20.755041792,
+        "model": "Qwen/Qwen3-4B",
+        "batch_size": 2
+      },
+      "Qwen/Qwen3-1.7B": {
+        "ms_per_sample": 153.74378031143956,
+        "peak_gb": 11.695473152,
+        "model": "Qwen/Qwen3-1.7B",
+        "batch_size": 2
+      }
+    },
+    "eager/fixed": {
+      "Qwen/Qwen3-4B": {
+        "ms_per_sample": 570.0649532191164,
+        "peak_gb": 21.813494272,
+        "model": "Qwen/Qwen3-4B",
+        "batch_size": 1
+      },
+      "Qwen/Qwen3-1.7B": {
+        "ms_per_sample": 246.9837493117666,
+        "peak_gb": 17.32891904,
+        "model": "Qwen/Qwen3-1.7B",
+        "batch_size": 2
+      }
+    },
+    "eager/natural": {
+      "Qwen/Qwen3-4B": {
+        "ms_per_sample": 399.13888132286957,
+        "peak_gb": 21.934768128,
+        "model": "Qwen/Qwen3-4B",
+        "batch_size": 1
+      },
+      "Qwen/Qwen3-1.7B": {
+        "ms_per_sample": 191.59798229156877,
+        "peak_gb": 17.32891904,
+        "model": "Qwen/Qwen3-1.7B",
+        "batch_size": 2
+      }
+    }
+  },
+  "seq_len": 1024,
+  "rank": 8
+}
