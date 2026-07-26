@@ -1,0 +1,45 @@
+{
+  "config": {
+    "preset": "fig1_dolci",
+    "gt_model": "Qwen/Qwen3-4B",
+    "gt_lora_rank": 16,
+    "logra_rank": 8,
+    "attn": "sdpa",
+    "max_len": 1024,
+    "n_eval": 400
+  },
+  "methods": {
+    "logra_4B": {
+      "per_anchor_mean": 0.7702082634372238,
+      "per_anchor_std": 0.14896791849779917,
+      "aggregated": 0.8941510884443027,
+      "flops_total": 1453326336,
+      "flops_measured": 0,
+      "flops_analytic": 1453326336,
+      "flops_per_sample": 1816657.92,
+      "inference_time_s": 286.0734336460009,
+      "load_time_s": 74.69464960799087,
+      "time_per_sample_ms": 357.59179205750115,
+      "n_samples": 800,
+      "cost_notes": [
+        "logra_fim pinv: 252 blocks x 64^3"
+      ]
+    },
+    "logra_1.7B": {
+      "per_anchor_mean": 0.2457498180176249,
+      "per_anchor_std": 0.18249554306728794,
+      "aggregated": 0.430909755685973,
+      "flops_total": 1130364928,
+      "flops_measured": 0,
+      "flops_analytic": 1130364928,
+      "flops_per_sample": 1412956.16,
+      "inference_time_s": 180.33706685493235,
+      "load_time_s": 32.564494449063204,
+      "time_per_sample_ms": 225.42133356866543,
+      "n_samples": 800,
+      "cost_notes": [
+        "logra_fim pinv: 196 blocks x 64^3"
+      ]
+    }
+  }
+}

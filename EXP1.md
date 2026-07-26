@@ -401,38 +401,37 @@ eval slice and this is the full 400x400 eval; don't treat this as a bug, they're
 deliberately different eval sizes measuring the same thing.
 
 **Plot:** `.tuning_logs/plot_scaling_part2.py` generates
-`baselines/out/fig1_dolci/scaling_figure.png`. **As of end of session this plot is
-STALE / not regenerated against the corrected results above** — it was last written
-against an earlier, partial set of points and pulls its LoGRA horizontal reference
-lines from `baselines/out/fig1_dolci/table1.json` (`logra_r8` = +0.9079, `logra_proxy_1.7B`
-= +0.5779). **table1.json is a pre-existing, already-committed-to-git file from an
-earlier stage of this project** (predates the Part-1 `draft50x50_table.json` unified
-methodology; NOT produced by this session, NOT some external/parallel agent's output as
-was briefly suspected mid-session — `git log`/`git ls-files` confirm it's already
-tracked from an earlier commit). **Its LoGRA rows ARE at the matching 400x400 eval
-size**, unlike Part 1's `draft50x50_table.json` `logra_4B`/`logra_1.7B` which are 50x50-
-slice numbers — so `table1.json`'s LoGRA values are the size-correct reference for this
-plot, IF you trust the run that produced them.
+`baselines/out/fig1_dolci/scaling_figure.{png,pdf}`. **RESOLVED** (was previously
+pulling unverified reference lines from `table1.json` — see history below): the user
+was asked whether to trust `table1.json`'s pre-existing LoGRA numbers or recompute fresh,
+and explicitly chose to recompute. Fresh values now live in
+`baselines/out/fig1_dolci/logra_400x400_r8.json`, produced by
+`.tuning_logs/_logra_400x400_recompute.py` — the exact same call pattern as Part 1's
+LoGRA rows (`score_logra(..., lora_rank=8, max_len=1024, attn_implementation="sdpa")`,
+GT=Qwen3-4B rank16) but on the FULL unsliced 400x400 splits instead of Part 1's 50x50
+slice:
 
-**Open flag, not yet resolved:** `table1.json`'s own `influcoder_68m` aggregated value is
-**+0.0466** — this is wildly inconsistent with this session's n_a=1500 result of
-**+0.7676** for what should be a comparable/larger training config. This is very likely
-the exact same result documented in the `dolci-non-reproduction` memory ("InfluCoder hit
-~+0.78 on dolci-instruct where the docs record a ~+0.05 collapse, on identical code") —
-i.e. `table1.json` is probably the source of that older, still-unexplained collapse
-finding, run under some different condition (possibly an older
-`train_fig1_encoders.py`-era hyperparameter set, before this session's tuning rounds in
-`FINDINGS.md`'s "InfluCoder training-tuning" section, or a different max_len/attn
-config). **Do not blindly trust `table1.json`'s LoGRA numbers just because the eval size
-matches** — the fact that its own InfluCoder row is so different from this session's
-result under supposedly-similar conditions means something about how that whole file was
-produced is not apples-to-apples with the current pipeline. Before finalizing the Part 2
-plot, either (a) recompute LoGRA r8 (4B) and LoGRA r8 (1.7B proxy) fresh on the exact same
-400x400 eval using this session's known-good LoGRA code path (`baselines/logra/score.py`,
-same as Part 1), so the reference lines are fully vouched-for, or (b) get explicit user
-sign-off to use `table1.json`'s numbers as-is despite the unexplained discrepancy. **This
-was an open question put to the user at end of session, not yet answered when this
-document was last updated** — check chat history for the resolution before proceeding.
+| row | agg rho (400x400, r8, sdpa) | vs. table1.json's (unverified) value |
+|---|---:|---:|
+| logra_4B | +0.8942 | +0.9079 (close — within noise) |
+| logra_1.7B (proxy) | +0.4309 | +0.5779 (notably different) |
+
+The 1.7B row also cross-checks against an independent earlier-this-session run
+(`baselines/out/fig1_dolci/logra_uniform_r8.json`'s `logra_proxy_1.7B_r8` = +0.4299,
+computed via a near-identical script, `.tuning_logs/_logra_uniform_r8.py`, same rank/eval
+size but relying on `score_logra`'s attn default rather than passing it explicitly) —
+the two independent runs agree to within 0.001, which is exactly the kind of consistency
+`table1.json` was lacking. **The `plot_scaling_part2.py` script and the current
+`scaling_figure.png`/`.pdf` now use these recomputed, cross-verified values, NOT
+`table1.json`.** The InfluCoder curve crosses the 1.7B LoGRA line almost immediately
+(already above it at the smallest tested size, n=75 total) and does not reach the 4B
+LoGRA line anywhere in the tested range (max +0.7676 at n=4500 vs. +0.8942).
+
+**`table1.json`'s own internal inconsistency (its `influcoder_68m` = +0.0466 vs. this
+session's +0.7676 at a comparable/larger training size) is still unexplained** — it
+remains flagged in `FINDINGS.md` as the likely source of the `dolci-non-reproduction`
+memory's still-open "~+0.78 vs ~+0.05" discrepancy. Nothing above resolves that; it only
+means Part 2's own plot no longer depends on trusting that file.
 
 ## 8. Explicitly NOT done yet / open next steps
 
@@ -461,18 +460,6 @@ document was last updated** — check chat history for the resolution before pro
   now that this is explicitly sanctioned. Nothing about the methodology requires
   sequential execution; it was only done sequentially this session because the 50x50
   peek was already fast enough not to bother.
-- **Part 2's LoGRA reference lines are not yet finalized** — see the "Open flag, not yet
-  resolved" paragraph at the end of §7's Part 2 subsection. Needs either a fresh,
-  known-good LoGRA r8 run at 400x400 (4B and 1.7B proxy) on this session's own code path,
-  or explicit user sign-off to trust `table1.json`'s pre-existing LoGRA numbers despite its
-  own InfluCoder row being inexplicably inconsistent with this session's results.
-- **Part 2's `scaling_figure.png` has not been regenerated against the final, corrected
-  11-point result table** (`scaling_68m_400x400.json` + `_extra.json` combined) — it was
-  last built against an earlier/partial run. Regenerate `plot_scaling_part2.py`'s output
-  once the LoGRA reference-line question above is settled, and consider adopting this
-  repo's validated categorical palette / mark-spec conventions (`C_GRAD`/`C_FWD`/`C_FREE`,
-  the style `_plot_draft50x50.py` uses) rather than the plain default-matplotlib-color
-  styling `plot_scaling_part2.py` currently has, for visual consistency with Part 1.
 - **`lr=1e-5` in the Part 2 sweep's `distill()` call is unexplained** (see §7's Part 2
   subsection) — it silently overrides `train_fig1_encoders.py`'s actual recipe default of
   `5e-5`, and no rationale for this specific override was found in this session's

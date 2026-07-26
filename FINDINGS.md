@@ -224,6 +224,18 @@ every axis that was actually swept, split into what helped, what didn't, and wha
   this session's pipeline just because they're at the same 400x400 eval size — the
   internal inconsistency suggests the run that produced the whole file differs from the
   current known-good code path in some unidentified way.
+- **LoGRA r8 recomputed fresh at 400x400 (sdpa, max_len=1024) rather than trusting
+  `table1.json`, per explicit user instruction.** `logra_4B` = +0.8942 (vs.
+  `table1.json`'s unverified +0.9079 — close, within noise); `logra_1.7B` proxy =
+  +0.4309 (vs. `table1.json`'s +0.5779 — notably different, another reason not to have
+  trusted that file blindly). The 1.7B number cross-checks to within 0.001 against an
+  independent earlier-this-session run (`logra_uniform_r8.json`'s `logra_proxy_1.7B_r8` =
+  +0.4299), which is the kind of agreement `table1.json` conspicuously lacked. Script:
+  `.tuning_logs/_logra_400x400_recompute.py`; output:
+  `baselines/out/fig1_dolci/logra_400x400_r8.json`. The Part-2 scaling curve crosses the
+  1.7B LoGRA line almost immediately (already above it at the smallest tested size,
+  n=75) and doesn't reach the 4B line anywhere in the tested range (max +0.7676 at
+  n=4500 vs. +0.8942).
 
 ## Why this session's full-vs-proxy LoGRA gap looks smaller than the original paper's
 
