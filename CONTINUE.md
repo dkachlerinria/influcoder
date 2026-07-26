@@ -3,6 +3,21 @@
 _A "pick up here" snapshot for the next session. State only — the reasoning and evidence live in
 `FINDINGS.md` (what we believe), `GOALS.md` (why we're doing this), `TODO.md` (what's queued)._
 
+## Infra reference
+
+`G5K.md` and `G5K-CPU-AGENT.md` are operational notes for driving Grid5000 (reservation rules,
+`oarsub`/`oarsh` recipes, the three brain/GPU-dispatch architectures, and preemption/checkpointing
+tricks) — read these before reserving or scripting anything on G5K. Key points relevant to this
+project: always request `gpu=1` (never a whole node), check `oarstat -u dkachler` across sites before
+submitting, and besteffort GPU jobs can be preempted at any time — checkpoint accordingly. Grenoble is
+the only site so far with `claude`/nvm set up in `$HOME`.
+
+**Open question, not yet resolved:** `G5K-CPU-AGENT.md` states the home-directory quota is 24GB soft /
+97GB hard, but `df -h /home/dkachler` on this node reports an 18TB NFS export with 6.6TB free. These
+are likely two different numbers (a per-user quota vs. the shared filesystem's total size), but no
+`quota`/`lfs` tool was available on this node to reconcile them directly — don't assume multi-TB
+headroom is actually usable per-user without checking on a node/frontend where `quota -s` works.
+
 ## Where things stand
 
 Figure 1 (cost vs. quality Pareto vs. Qwen3-4B-rank16 GT) is built and believed-correct on two pools:
