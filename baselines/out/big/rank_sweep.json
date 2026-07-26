@@ -1,0 +1,76 @@
+{
+  "config": {
+    "preset": "big",
+    "gt_shape": [
+      100,
+      100
+    ],
+    "grad_model": "HuggingFaceTB/SmolLM2-135M",
+    "proj_dim": 8192,
+    "note": "LESS lora_alpha pinned to 4*rank (its default ratio)"
+  },
+  "results": {
+    "logra_raw": {
+      "2": {
+        "aggregated": 0.5636723672367235,
+        "per_anchor_mean": 0.46214792977144226
+      },
+      "4": {
+        "aggregated": 0.6154335433543354,
+        "per_anchor_mean": 0.5239935193519352
+      },
+      "8": {
+        "aggregated": 0.8172217221722171,
+        "per_anchor_mean": 0.7169786978697869
+      },
+      "16": {
+        "aggregated": 0.9058265826582657,
+        "per_anchor_mean": 0.8258377437743774
+      },
+      "32": {
+        "aggregated": 0.9294089408940893,
+        "per_anchor_mean": 0.8789843384338432
+      }
+    },
+    "logra_fim": {
+      "2": {
+        "aggregated": 0.3546474647464746,
+        "per_anchor_mean": 0.3146791479147914
+      },
+      "4": {
+        "aggregated": 0.6655025502550255,
+        "per_anchor_mean": 0.4545848184818481
+      },
+      "8": {
+        "aggregated": 0.47911191119111907,
+        "per_anchor_mean": 0.3659450345034503
+      },
+      "16": {
+        "aggregated": 0.5179237923792379,
+        "per_anchor_mean": 0.37305862586258626
+      },
+      "32": {
+        "aggregated": 0.5595079507950794,
+        "per_anchor_mean": 0.482189498949895
+      }
+    },
+    "less": {
+      "8": {
+        "aggregated": 0.951167116711671,
+        "per_anchor_mean": 0.9158936693669366
+      },
+      "16": {
+        "aggregated": 0.9508430843084308,
+        "per_anchor_mean": 0.898785598559856
+      },
+      "32": {
+        "aggregated": 0.9493189318931892,
+        "per_anchor_mean": 0.9039860786078607
+      },
+      "128": {
+        "aggregated": 0.9511911191119111,
+        "per_anchor_mean": 0.9106685868586857
+      }
+    }
+  }
+}

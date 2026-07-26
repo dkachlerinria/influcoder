@@ -1,0 +1,131 @@
+{
+  "config": {
+    "preset": "paper200",
+    "grad_model": "Qwen/Qwen3-4B",
+    "gt_shape": [
+      200,
+      200
+    ],
+    "seed": 0
+  },
+  "methods": {
+    "influcoder": {
+      "per_anchor_mean": 0.6792816121625606,
+      "per_anchor_std": 0.02496295346743585,
+      "aggregated": 0.6995664891622291,
+      "flops_total": 7458920371584,
+      "flops_measured": 7458920371584,
+      "flops_analytic": 0,
+      "flops_per_sample": 18647300928.96,
+      "inference_time_s": 0.5206398580012319,
+      "load_time_s": 1.828905695998401,
+      "time_per_sample_ms": 1.3015996450030798,
+      "n_samples": 400,
+      "cost_notes": []
+    },
+    "logra_raw": {
+      "per_anchor_mean": 0.7795064726618167,
+      "per_anchor_std": 0.08969042946489007,
+      "aggregated": 0.8952388809720245,
+      "flops_total": 3411058768154496,
+      "flops_measured": 3411057314828160,
+      "flops_analytic": 1453326336,
+      "flops_per_sample": 8527646920386.24,
+      "inference_time_s": 79.09219757000028,
+      "load_time_s": 3.026130035999813,
+      "time_per_sample_ms": 197.7304939250007,
+      "n_samples": 400,
+      "cost_notes": [
+        "logra_fim pinv: 252 blocks x 64^3"
+      ]
+    },
+    "logra_fim": {
+      "per_anchor_mean": 0.18171473786844675,
+      "per_anchor_std": 0.07008554095669124,
+      "aggregated": 0.28658366459161483,
+      "flops_total": 3411058768154496,
+      "flops_measured": 3411057314828160,
+      "flops_analytic": 1453326336,
+      "flops_per_sample": 8527646920386.24,
+      "inference_time_s": 79.09219757000028,
+      "load_time_s": 3.026130035999813,
+      "time_per_sample_ms": 197.7304939250007,
+      "n_samples": 400,
+      "cost_notes": [
+        "logra_fim pinv: 252 blocks x 64^3"
+      ]
+    },
+    "less": {
+      "per_anchor_mean": 0.9095568814220357,
+      "per_anchor_std": 0.049223884105989636,
+      "aggregated": 0.9598334958373961,
+      "flops_total": 5438692708254592,
+      "flops_measured": 3706961894507392,
+      "flops_analytic": 1731730813747200,
+      "flops_per_sample": 13596731770636.48,
+      "inference_time_s": 143.41597221999837,
+      "load_time_s": 4.614939597002376,
+      "time_per_sample_ms": 358.5399305499959,
+      "n_samples": 400,
+      "cost_notes": [
+        "LESS CudaProjector: 2*264241152*8192*400"
+      ]
+    },
+    "semantic": {
+      "per_anchor_mean": 0.28840026755755077,
+      "per_anchor_std": 0.1236533636633219,
+      "aggregated": 0.3768349208730219,
+      "flops_total": 7458920371584,
+      "flops_measured": 7458920371584,
+      "flops_analytic": 0,
+      "flops_per_sample": 18647300928.96,
+      "inference_time_s": 0.5011891659996763,
+      "load_time_s": 2.653543117998197,
+      "time_per_sample_ms": 1.2529729149991908,
+      "n_samples": 400,
+      "cost_notes": []
+    },
+    "rdsplus": {
+      "per_anchor_mean": 0.2555207734337386,
+      "per_anchor_std": 0.12781195071460494,
+      "aggregated": 0.3122103052576315,
+      "flops_total": 1658605456952192,
+      "flops_measured": 1658605456952192,
+      "flops_analytic": 0,
+      "flops_per_sample": 4146513642380.48,
+      "inference_time_s": 22.437599210999906,
+      "load_time_s": 2.606025552999199,
+      "time_per_sample_ms": 56.093998027499765,
+      "n_samples": 400,
+      "cost_notes": []
+    },
+    "tfidf": {
+      "per_anchor_mean": 0.15466973595813452,
+      "per_anchor_std": 0.07125636651785634,
+      "aggregated": 0.2993254321242881,
+      "flops_total": 0,
+      "flops_measured": 0,
+      "flops_analytic": 0,
+      "flops_per_sample": 0.0,
+      "inference_time_s": 0.2264570970000932,
+      "load_time_s": 0.0998524409988022,
+      "time_per_sample_ms": 0.566142742500233,
+      "n_samples": 400,
+      "cost_notes": []
+    },
+    "random": {
+      "per_anchor_mean": -0.004623393084827121,
+      "per_anchor_std": 0.06602828726288722,
+      "aggregated": -0.05280582014550365,
+      "flops_total": 0,
+      "flops_measured": 0,
+      "flops_analytic": 0,
+      "flops_per_sample": 0.0,
+      "inference_time_s": 0.00025980899954447523,
+      "load_time_s": 0.00909326799956034,
+      "time_per_sample_ms": 0.0006495224988611881,
+      "n_samples": 400,
+      "cost_notes": []
+    }
+  }
+}
