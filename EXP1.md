@@ -293,9 +293,10 @@ the quality).
 
 ## 7. Plots (Figure 1)
 
-This experiment produces a two-part Figure 1:
+This experiment produces a three-part Figure 1:
 - **Part 1: Cost vs Quality.** Aggregate Spearman rho vs inference ms/sample for all methods.
 - **Part 2: InfluCoder Scaling.** Aggregate Spearman rho vs number of training anchors, showing how InfluCoder 68m improves with more data, with horizontal baselines for LoGRA.
+- **Part 3: GPU-time-vs-samples-processed amortization curve.** At what cumulative GPU time does InfluCoder's fixed setup cost pay for itself against LESS's/LoGRA's per-sample cost?
 
 ### Part 1: Cost vs Quality
 `.tuning_logs/_plot_draft50x50.py` generates `baselines/out/fig1_dolci/draft50x50_figure.{png,pdf}` from the JSON table above. Reuses this repo's validated categorical palette
@@ -432,6 +433,93 @@ session's +0.7676 at a comparable/larger training size) is still unexplained** �
 remains flagged in `FINDINGS.md` as the likely source of the `dolci-non-reproduction`
 memory's still-open "~+0.78 vs ~+0.05" discrepancy. Nothing above resolves that; it only
 means Part 2's own plot no longer depends on trusting that file.
+
+### Part 3: GPU-time-vs-samples-processed amortization curve
+
+**Question:** at what point does using InfluCoder actually become cheaper than just
+running LESS/LoGRA directly, in real cumulative GPU time? Explicit user request, verbatim
+intent: test LoGRA 1.7B, LESS 4B, and InfluCoder 68m, timing how long each takes to
+"process" 100 / 1K / 10K samples, where **"process" means computing the per-sample
+representation only** (LESS: TRAK-projected per-sample gradient via `collect_grads`;
+LoGRA: per-sample `[r,r]` gradient factor via `LoGra.encode()`; InfluCoder: encoder
+embedding via `embed()`) — explicitly excluding any anchor-vs-pool scoring matmul, which
+is out of scope here (depends on query-set size, "a can of worms" for a separate
+experiment). LESS/LoGRA were only run at n=100/1000 (cost-prohibitive beyond that, per
+explicit instruction) and extrapolated to 10K from the measured per-sample rate; InfluCoder
+was run at n=100/1000/10000 directly. InfluCoder's distillation set for this exploratory
+run was 250 anchors x 500 pool (not the final experiment's real train size — "just to see
+how the curve will look like").
+
+**Scripts:** `.tuning_logs/_part3_less_logra_process.py` (LESS 4B r16 + LoGRA 1.7B r8,
+both `sdpa`, `max_len=1024`) and `.tuning_logs/_part3_influcoder_process.py` (InfluCoder
+68m). Run as two separate OAR jobs in parallel on the same GPU type (`abacus11`, 24GB
+card) per explicit user permission to parallelize across instances.
+
+**Why dolci-instruct specifically (the pool all three scripts draw samples from):** it's
+the only one of this repo's three sample pools that can supply real, non-duplicated
+samples at every scale this experiment needs. BBH is hard-capped at 6511 total examples;
+the local Dolly file has only 15011 rows; `tasksource/dolci-instruct` streams from ~1.8M
+rows across 8 parquet shards, comfortably covering 100 through 100K+.
+
+**Bug hit and fixed: the LESS/LoGRA script initially OOM'd on its very first batch
+(n=100).** Root cause: it hardcoded `block_size=128` for `collect_grads`'s
+`BasicProjector`, silently ignoring the exact fix already documented in §5.1 above (this
+24GB card requires `block_size=16` at `lora_rank=16` — `block_size=128` was one of the
+three root causes of the original LESS OOM saga, not a new bug, just the same old fix not
+being carried over into a new script). Fixed by setting `block_size=16`; reran clean.
+**Lesson: any new script that calls `collect_grads` directly needs this same fix applied
+by hand — it lives in each call site, not in a shared default.**
+
+**Results** (`baselines/out/fig1_dolci/part3_influcoder_process.json` +
+`part3_less_logra_process.json`):
+
+| method | model | setup/load time | n=100 | n=1000 | n=10000 |
+|---|---|---:|---:|---:|---:|
+| InfluCoder | 68m (250x500, epochs=8) | 459.58s (356.42s collect + 103.16s train) | 43.95 ms/sample* | 11.01 ms/sample | 10.81 ms/sample |
+| LESS | 4B, r=16, sdpa | 74.06s (model load) | 1123.14 ms/sample | 1091.67 ms/sample | not run (extrapolated) |
+| LoGRA | 1.7B, r=8, sdpa | 35.77s (model load) | 218.38 ms/sample | 217.63 ms/sample | not run (extrapolated) |
+
+\* InfluCoder's n=100 figure is inflated by a batch_size=32 CUDA-kernel warmup artifact on
+the first `embed()` call at that batch shape (same class of issue as §5.4's warmup finding,
+but for a new kernel shape, not a cold GPU) — n=1000/10000 are consistent with each other
+(~10.8-11.0 ms/sample) and are the trustworthy steady-state rate.
+
+**Linearity check (the user explicitly asked to be checked on this): confirmed for all
+three methods** — LESS varies only ~3% between n=100 and n=1000 (1123.14 -> 1091.67
+ms/sample); LoGRA varies <0.4% (218.38 -> 217.63 ms/sample); InfluCoder's steady-state
+(post-warmup) rate is effectively flat (11.01 -> 10.81 ms/sample, n=1000 -> n=10000).
+Extrapolating LESS/LoGRA's measured per-sample rate to 10K is therefore sound: LESS would
+take ~10,917s (~3.03 hours) for 10K samples; LoGRA ~2,176s (~36.3 min).
+
+**Amortization points** (`.tuning_logs/plot_part3.py`, solving
+`InfluCoder_samples(t) = other_samples(t)` from each method's own
+setup/load-time-plus-constant-rate model):
+
+- **InfluCoder overtakes LESS at ~463s of cumulative GPU time (~357 samples processed).**
+- **InfluCoder overtakes LoGRA at ~482s of cumulative GPU time (~2049 samples processed).**
+
+Both crossovers land within seconds to tens of seconds of InfluCoder's own setup finishing
+(459.6s) — not a gradual catch-up. This is a direct consequence of the per-sample speed
+gap being so large (InfluCoder ~101x faster than LESS, ~20x faster than LoGRA at steady
+state) that once InfluCoder starts processing, it doesn't need to "catch up" so much as
+immediately overtake: LESS has only processed ~407 samples by the time InfluCoder's setup
+finishes, and InfluCoder covers that same ground before LESS gets meaningfully further
+ahead.
+
+**Plot:** `.tuning_logs/plot_part3.py` generates `baselines/out/fig1_dolci/part3_figure.{png,pdf}`.
+X-axis = cumulative GPU time (seconds, linear); Y-axis = cumulative samples processed
+(log scale, per explicit request — a log y-axis can't render 0, so each curve is drawn as
+a flat segment at a `FLOOR=0.5` visual floor during its setup/load phase, purely a
+plotting convention and not a real value). Reuses `C_FWD` orange for InfluCoder; LESS and
+LoGRA get their own blue/purple (previously both shared one `C_GRAD` blue in Parts 1/2,
+which worked there since they never appeared as separate curves needing to be
+told apart on the same axes — here they do).
+
+**Caveat — not a final number.** This is explicitly an exploratory run (250x500
+distillation set, single measurement per size, no repeated trials for noise estimation)
+meant only to confirm the shape of the curve exists and roughly where it crosses. Don't
+quote the exact "463s" / "357 samples" figures as final results without re-running at the
+real experiment's actual train size and with repeated trials.
 
 ## 8. Explicitly NOT done yet / open next steps
 

@@ -254,3 +254,26 @@ Two distinct, independently-evidenced mechanisms, either of which could explain 
    batch to amortize fixed per-sample overhead (kernel launch, autograd graph build/teardown). A paper
    timing setup where FLOPs actually dominate wall-clock (larger batches, aggregate-pass timing, or
    different hardware) would show a much more size-proportional, graded cost curve.
+
+## GPU-time-vs-samples-processed amortization curve (EXP1 figure, Part 3)
+
+Confirms LESS/LoGRA/InfluCoder all have genuinely constant (linear) per-sample "process"
+cost — LESS varies ~3% between n=100 and n=1000 (1123.14 -> 1091.67 ms/sample), LoGRA
+<0.4% (218.38 -> 217.63), InfluCoder's steady-state (post-warmup) rate is flat (11.01 ->
+10.81 ms/sample, n=1000 -> n=10000). This matters because it means a single small-n
+measurement is enough to extrapolate cost at any scale for these methods — no need to
+actually run LESS/LoGRA at 10K/100K to know roughly how long they'd take.
+
+The resulting amortization point (InfluCoder's cumulative-samples-processed curve
+crossing LESS's/LoGRA's) lands at only ~463s GPU time / ~357 samples vs. LESS and ~482s /
+~2049 samples vs. LoGRA — i.e. within seconds of InfluCoder's own one-time setup (459.6s:
+356.4s gradient collection + 103.2s distillation training) finishing, not a long gradual
+catch-up. **Gradient collection (Qwen3-4B teacher targets) is ~3.5x more expensive than
+the actual distillation training** (356s vs 103s) — the "expensive" part of standing up
+InfluCoder is computing the teacher gradients it distills from, not the distillation
+step itself. Full methodology/numbers: `EXP1.md` §7 Part 3.
+
+**Recurring bug, not a new one:** a fresh script calling `collect_grads` directly OOM'd
+immediately at `block_size=128` on the same 24GB card this repo has hit before (see
+above LESS OOM saga) — `block_size=16` is a per-call-site fix, not a shared default, so
+it has to be applied by hand in every new script that calls this function.
