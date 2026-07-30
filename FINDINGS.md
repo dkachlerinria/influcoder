@@ -20,12 +20,25 @@ line. This is the shareable summary; per-run detail (every tuning round, every b
   cost is the rank-independent frozen-backbone forward+backward. An apparent 38% rank-4-vs-8 timing gap
   was a same-process OS-page-cache-warmup artifact, not a rank effect (isolated compute-only comparison:
   ~5%, noise-level).
-- **Batching LoGRA is a real but unsafe lever — rejected for the default methodology.** Where it fits
-  (proxies only; the 4B model already OOMs at batch=1, 21.9GB/46GB), batch=4 buys 7-18% speedup, but
-  `modeling_logra.py` computes one batch-*mean* loss before backward, so a sample's "per-sample gradient"
-  at batch>1 is diluted by whatever else shares its batch — verified real score drift up to **0.126**
-  (1.7B) / **0.064** (0.6B), far past noise. `batch_size=1` stays the correctness standard; a batch=4
-  override exists only as an explicit, flagged, user-requested variant (`update_proxy_rows_batched.py`).
+- **CORRECTED — batching LoGRA does not dilute per-sample gradients; the "unsafe lever" verdict below
+  was wrong.** `modeling_logra.py` passes `num_items_in_batch=1` to HF's loss, which forces
+  `reduction="sum"` — a sum decomposes exactly per sample, it is not a batch-mean. Padded positions carry
+  `-100` labels, so they contribute exactly zero to the `[B,r,r]` per-sample outer products, and
+  right-padding + causal attention means no real token ever attends to a pad, so the missing per-batch
+  `attention_mask` is harmless too. The previously-reported "0.126 (1.7B) / 0.064 (0.6B) score drift" was
+  `max|delta|` over a 400x400 score matrix — a worst-case order statistic over 160k cells that badly
+  overstates the effect. Measured on the metric that actually matters, aggregate Spearman, batching moves
+  quality by **~0.001** (Qwen3-1.7B r32/fig1_dolci: +0.5956 batched vs. +0.5954 at batch=1) — noise-level,
+  not a correctness issue. Two real, gradient-math-safe speedup levers instead: (1) drop the
+  `torch.cuda.empty_cache()` fired every 10 *samples* inside `encode()` — ~0.85s/call, ~29% of total wall
+  time on its own; (2) **length-sorted, token-budget batching** (constant tokens/batch, not constant
+  sample count — activation memory scales with padded tokens, and fixed-size batching is hostage to its
+  longest batch, OOMing at bs≥8 on a 24GB card for only ~15% gain). Together these gave **~2.4x** total on
+  a 24GB card (209.8ms/sample at batch=1 with empty_cache → 124.7ms token-budget-batched, 16.3GB peak).
+  The 21.9GB/46GB 4B-at-batch=1 figure above predates this accounting (measured with the empty_cache
+  overhead still in place) — re-verify it before trusting it as a batching blocker for the 4B row.
+  `batch_size=1` is still the number every other row in this doc was measured at, so it remains the
+  apples-to-apples baseline until the batched methodology is adopted repo-wide and everything is re-timed.
 - **SDPA attention is a free, verified win — adopted as default.** vs. eager: -30-35% memory, -10-28%
   time at batch=1, zero batching needed. Verified safe (eager-vs-sdpa Δagg = +0.0046, noise-level) before
   adopting. Also reveals a real, if narrow, size-proportional speed ordering (144/130/126ms across
@@ -175,20 +188,42 @@ every axis that was actually swept, split into what helped, what didn't, and wha
 
 ## Pool swap: Dolly → tasksource/dolci-instruct (everything else held fixed)
 
-- **Headline: InfluCoder's distillation gain essentially vanishes on dolci-instruct, and the truncation
-  bug above is NOT the explanation.** On Dolly, distillation adds +0.35 to +0.40 agg ρ over the untrained
+**CORRECTED — the "distillation gain vanishes" headline below was never a real
+pool-swap effect; it was a cache bug, root-caused and fixed in a later session (see
+EXP1.md §5.6).** `baselines/scaling_sweep.py`'s `train_features()` cached the expensive
+train-side gradient features under a key built from model/train-size/rank/seed/eval-size
+— but not the pool name. `fig1` (dolly) and `fig1_dolci` (dolci-instruct) are identical on
+every other field of that key, so whichever preset called `train_features()` second
+silently reused the first preset's pool-side gradients; `distill()` then trained the
+encoder against a `targets` matrix whose column *j* described a different (wrong-pool)
+text than the `pool_texts[j]` actually being embedded at that index — a scrambled label,
+not a hard one, and the same shared `targets` matrix corrupts all three encoder sizes at
+once (matches the "collapse is uniform across 68m/150m/400m" observation below exactly).
+Confirmed by retraining from scratch after adding the pool name to the cache key: all
+three sizes trained cleanly, no collapse, epoch-by-epoch stable
+(68m +0.782, 150m +0.769, 400m +0.796, all on the 400x400 eval) — essentially matching
+Dolly's own quality level, not "vanishing." The overfitting-shaped epoch curve reported
+below (peak at epoch 3, degrade after) was a real symptom of training against scrambled
+labels, not evidence of dolci-instruct's heterogeneity being harder to learn from — that
+theory can be discarded. The original bullets are kept below for the record (and because
+the LoGRA/TF-IDF/RDS+ secondary effects noted are unaffected by this bug — those methods
+don't touch `train_features()`), but do not trust the InfluCoder-specific claims in them.
+
+- ~~**Headline: InfluCoder's distillation gain essentially vanishes on dolci-instruct, and the truncation
+  bug above is NOT the explanation.**~~ On Dolly, distillation adds +0.35 to +0.40 agg ρ over the untrained
   baseline at every size. On dolci-instruct (post-fix, 1024-token cap): trained sits *below* untrained at
   every size (68m +0.32 untrained vs. +0.05 trained; 150m +0.28 vs. +0.12; 400m +0.21 vs. +0.07). Fixing
   the truncation bug nearly doubled every untrained score (confirming it was real) but did not rescue
-  trained scores — they stayed flat or got worse.
-- **Root cause is overfitting, not truncation:** all three encoder sizes show eval agg ρ peaking at
+  trained scores — they stayed flat or got worse. **(This was the cache-collision corruption, see above.)**
+- ~~**Root cause is overfitting, not truncation:**~~ all three encoder sizes show eval agg ρ peaking at
   epoch 3/8 then degrading every subsequent epoch, despite training loss falling smoothly to near-zero —
   reproduces identically at both the buggy (512) and fixed (1024) max_len, ruling out truncation as the
   driver. Plausible cause (not investigated further): dolci-instruct is a heterogeneous SFT-mix (math,
   crystallography, moderation, multilingual in one flat prompt/answer pool) vs. Dolly's more uniform
   open-domain instruction shape — the bi-encoder may need different epoch selection or train-side
-  sampling to generalize across that heterogeneity.
-- **Secondary pool-swap effects:** both LoGRA proxies transfer *better* on dolci-instruct than Dolly
+  sampling to generalize across that heterogeneity. **(Discard this theory — see correction above.)**
+- **Secondary pool-swap effects (unaffected by the cache bug — these methods don't call
+  `train_features()`):** both LoGRA proxies transfer *better* on dolci-instruct than Dolly
   (0.6B +0.03→+0.30, 1.7B +0.51→+0.58). TF-IDF goes **negative** (+0.30→-0.09) — lexical overlap is a much
   weaker influence signal on this heterogeneous pool. RDS+ drops (+0.31→+0.10).
 
@@ -212,18 +247,22 @@ every axis that was actually swept, split into what helped, what didn't, and wha
   at the end of the final epoch, before `distill()`'s internal restore runs) instead of
   `log["epoch_metrics"][log["best_epoch"]]` — no change to `distill()` itself needed, this
   is purely how the caller reads its return value.
-- **Open, unresolved discrepancy:** `baselines/out/fig1_dolci/table1.json` (a pre-existing,
-  already-committed file from an earlier project stage, NOT from this session) has
-  `influcoder_68m` aggregated = **+0.0466** — inconsistent with this session's scaling
-  sweep's n_a=1500 result of **+0.7676** for what should be a comparable/larger training
-  config on dolci-instruct. This is very likely the same result behind the
-  `dolci-non-reproduction` memory ("InfluCoder hit ~+0.78 where the docs record a ~+0.05
-  collapse, on identical code") — i.e. `table1.json` may be the actual source of that
-  older collapse finding, produced under some different (unrecorded) condition. Don't
-  trust `table1.json`'s other rows (e.g. its LoGRA numbers) as automatically comparable to
-  this session's pipeline just because they're at the same 400x400 eval size — the
-  internal inconsistency suggests the run that produced the whole file differs from the
-  current known-good code path in some unidentified way.
+- **RESOLVED (was "open, unresolved discrepancy"):** `baselines/out/fig1_dolci/table1.json`
+  (a pre-existing, already-committed file from an earlier project stage, NOT from this
+  session) has `influcoder_68m` aggregated = **+0.0466** — inconsistent with this
+  session's scaling sweep's n_a=1500 result of **+0.7676** for what should be a
+  comparable/larger training config on dolci-instruct. This *was* the same result behind
+  the `dolci-non-reproduction` memory ("InfluCoder hit ~+0.78 where the docs record a
+  ~+0.05 collapse, on identical code") — now root-caused: `train_features()`'s cache key
+  was missing the pool name, so `fig1` (dolly) and `fig1_dolci` (dolci-instruct) collided
+  and whichever ran second reused the other's pool-side gradients (see the "Pool swap"
+  section's correction above and `EXP1.md` §5.6). `table1.json`'s +0.0466 is the
+  corrupted-checkpoint number; the scaling sweep's +0.7676 reflects a run that (for
+  whatever cache-state reason at the time) avoided the collision. Fixed in
+  `baselines/scaling_sweep.py`; still don't assume `table1.json`'s OTHER rows (LoGRA
+  etc.) are directly comparable to this session's pipeline without checking — this
+  specific inconsistency is explained, but that file predates this session's fixes
+  broadly and wasn't otherwise audited.
 - **LoGRA r8 recomputed fresh at 400x400 (sdpa, max_len=1024) rather than trusting
   `table1.json`, per explicit user instruction.** `logra_4B` = +0.8942 (vs.
   `table1.json`'s unverified +0.9079 — close, within noise); `logra_1.7B` proxy =

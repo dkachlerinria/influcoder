@@ -44,7 +44,8 @@ and which genuinely diverge (and why).
   investigation (see `dolci-non-reproduction` memory / `FINDINGS.md`) — unrelated to this
   experiment except for sharing the same cached artifacts.
 - **GPU access.** All GPU-requiring scripts in this doc were run on Grid5000's `rennes`
-  site, `abacus11` cluster (24GB cards), reserved via e.g.
+  site, `abacus11` cluster (L40S-class, 24GB cards — NOT an H100, in case that gets said
+  in passing anywhere; see §5.6 for the actual bigger-GPU re-run), reserved via e.g.
   `oarsub -q p3 -p "cluster='abacus11'" -l gpu=1,walltime=2:00:00 'sleep 7200'`, then
   running the script either via `oarsh $OAR_JOB_ID <cmd>` or, since `rennes`'s `/home` is
   a shared NFS (see §10.6), simply passing the script as the job's own command. This is
@@ -74,6 +75,15 @@ the older `figure1_table.py`/`plot_figure1.py` output, which used r32 for the pr
 This uniform-rank convention is one of the things held constant across all three parts —
 see §4.
 
+**Update (§5.6): this uniform-rank convention was reversed for the vercors18 re-run.**
+Once batching removed rank's main practical cost (see §5.6), a fresh rank sweep on
+current hardware showed the proxies keep improving well past r8 (including the 0.6B
+proxy, previously believed pinned near zero at every rank), so the vercors18 draft table
+goes back to `figure1_table.py`'s original asymmetric r8(4B)/r32(proxies) recipe. The
+uniform-r8 numbers above remain the historical record for what was actually run under
+that instruction — they are not being retroactively changed, just superseded going
+forward. See §5.6 for the reasoning and the new numbers.
+
 ## 4. Shared setup and divergences across Parts 1, 2, and 3
 
 The user's explicit constraint for this documentation pass: parameters must follow the
@@ -91,7 +101,7 @@ places that genuinely differ.
 | `max_len` (`grad_max_len` == `encoder_max_len`) | **1024** | Parts 1, 2, 3 |
 | LESS rank | **16** | Parts 1 and 3 run LESS fresh at this rank; Part 2's LESS reference numbers are literally Part 1's r=16 rows (see divergence 4.2.4) |
 | LESS `proj_dim` / `lora_alpha` / `block_size` | 8192 / 512 / **16** | Parts 1 and 3 (block_size=16 is itself a bug fix, see §10.1 and §7's Part 3 methodology) |
-| LoGRA rank | **8** | Parts 1, 2 (fresh 400x400 recompute), and 3 — uniform across every LoGRA size tested anywhere in this experiment |
+| LoGRA rank | **8** | Parts 1, 2 (fresh 400x400 recompute), and 3 — uniform across every LoGRA size tested anywhere in this experiment. **Superseded for the vercors18 re-run (§5.6)**, which uses asymmetric r8(4B)/r32(proxies) instead — this row still describes what Parts 1-3 as originally run actually used. |
 | InfluCoder encoder architecture | `jhu-clsp/ettin-encoder-68m` (Part 1 also tests 150m) | Parts 1, 2, 3 |
 | InfluCoder teacher-gradient `proj_dim` | **65536** | Parts 1 (baked into the `fig1_dolci` preset used to train the real checkpoints), 2, 3 |
 | InfluCoder `epochs` | **8** | Parts 1, 2, 3 |
@@ -300,6 +310,183 @@ single-forward methods, `C_FREE` aqua = TF-IDF's horizontal reference line).
 
 Just rerun `.venv_h100/bin/python .tuning_logs/_plot_draft50x50.py` from the repo root
 after any table update — it's idempotent and fast (no GPU needed, pure plotting).
+
+### 5.6 Re-run on a bigger GPU (vercors18, RTX PRO 6000 Blackwell) — batching + asymmetric rank
+
+**Hardware correction first:** the original Part 1 numbers above (§5.4) were run on
+Grid5000 `rennes`/`abacus11`, an **L40S-class 24GB card** — not an H100, despite that
+possibly having been said in passing during discussion. This section's numbers are from a
+different reservation: Grid5000 `grenoble`/`vercors18`, an **NVIDIA RTX PRO 6000
+Blackwell Server Edition** (~98GB), reached the same way (`oarsub`/`oarsh`), same shared
+NFS-within-site caveat as §10.6.
+
+**Why revisit this at all:** curiosity about whether a much bigger, newer GPU changes the
+cost/quality *shape*, not just a constant-factor speedup — and specifically whether the
+"smaller proxy model = faster" story (the entire premise behind testing 1.7B/0.6B at all)
+survives scrutiny. Both questions turned up real findings, in order:
+
+**1. Batching is a genuine, verified-safe speedup for LoGRA, and it helps smaller models
+disproportionately more.** `baselines/logra/score.py` gained a `BIG_GPU` opt-in (env var
+`BIG_GPU=1` or `big_gpu=True` — the string **`BIG_GPU`** deliberately appears in that file
+so it's greppable/discoverable, not buried in a `.tuning_logs/` scratch script): it
+length-sorts samples before `encode()` and batches instead of the default
+`batch_size=1` loop, auto-retrying with a halved batch size on CUDA OOM (this method's
+custom per-sample-gradient backward retains full per-layer activations for every sample
+in the batch at once, so a naive single-batch-of-50 attempt OOM'd even on 98GB — there is
+no safe universal batch size, hence the retry ladder rather than a fixed guess). This is
+**not an approximation**: see `FINDINGS.md`'s corrected batching entry — the loss is
+sum-reduced (`num_items_in_batch=1`), which decomposes exactly per sample, so batching
+changes nothing about the gradient math. Measured effect (50x50, rank=8, vercors18,
+bs=1 vs. auto-found best batch size):
+
+| model | bs=1 | batched | batch size found | speedup |
+|---|---:|---:|---:|---:|
+| 4B | 129.30ms | 82.36ms | 8 | 1.57x |
+| 1.7B | 97.86ms | 43.57ms | 12 | 2.25x |
+| 0.6B | 95.85ms | 34.64ms | 25 | 2.77x |
+
+Quality is unaffected (agg ρ moved 0.001–0.013 across bs=1 vs. batched, same seed both
+runs — noise, not a correctness issue). The pattern (bigger relative gain for smaller
+models) is the mechanistic signature of batch_size=1 being launch/depth-bound rather than
+compute-bound: a small model doesn't saturate the GPU on a single sample, so batching
+converts idle capacity into throughput, and it has more idle capacity to convert.
+
+**Self-critique, because "proxy models are faster" is easy to overclaim:** the *absolute*
+proxy-model speedup is still far below what parameter count would predict (4B→0.6B is a
+~6.7x parameter ratio but only ~2.4x wall-clock even after batching), and **at `bs=1` —
+the convention this whole benchmark actually reports numbers under — 1.7B→0.6B buys
+almost nothing** (97.86 vs. 95.85ms, ~2%, inside noise) while 0.6B's r8 quality is
+actively negative. Under bs=1, "0.6B as a cheap proxy" is not a real cost/quality
+tradeoff — it's the same cost as 1.7B for a worse-than-random answer. The batching result
+above is real and reframes the achievable curve, but it does not retroactively make the
+bs=1 numbers in §5.4 a fair comparison; if bs=1 stays the reporting convention elsewhere,
+say so explicitly rather than importing this section's batched numbers into that context.
+
+**2. A fresh rank sweep (r8/r16/r32, same batched setup) reverses the uniform-rank
+decision — the 0.6B proxy is not "pinned near zero," it was rank-starved.** §3/§4.1's
+uniform-rank=8 convention was a deliberate, explicit choice to isolate model size from
+rank as confounds. Revisiting it because the historical belief that "the 0.6B proxy stays
+pinned near zero (-0.03 to +0.03) at every rank tested" (`FINDINGS.md`) turned out not to
+replicate:
+
+| model | r8 | r16 | r32 | ms/sample (r8→r32, batched) |
+|---|---:|---:|---:|---:|
+| 4B | +0.9129 | +0.7567 | +0.9493 | 82.4 → 88.6 |
+| 1.7B | +0.3377 | +0.6094 | +0.5209 | 43.6 → 47.1 |
+| 0.6B | -0.1306 | +0.0291 | **+0.2931** | 34.6 → 37.2 |
+
+4B and 1.7B bounce around non-monotonically across rank (consistent with LoGRA's
+unseeded upstream projection — single draws already swing ±0.03-0.14 per `FINDINGS.md`,
+so this is noise, not a rank effect). **0.6B is different: -0.13 → +0.03 → +0.29,
+monotonic, and clearly not pinned near zero by r32.** This is a real discrepancy with the
+existing `FINDINGS.md` line above — flagged here rather than silently overwritten; it's
+one seed on a 50x50 slice (high per-`FINDINGS.md`-sourced-variance regime), so treat it as
+"worth another seed or two to confirm," not settled. Given this, and given batching
+removes most of the cost penalty that made higher rank unattractive before, **the
+vercors18 draft table below uses `figure1_table.py`'s original asymmetric recipe (r8 for
+the 4B anchor, r32 for both proxies)** instead of uniform r8 — a deliberate reversal of
+the §3/§4.1 convention for this re-run specifically (that convention's own numbers, §5.4,
+are unaffected and remain as documented).
+
+**3. Full Part 1 method sweep, redone on vercors18 at the same 50x50 slice** (LESS via
+`traker`'s `BasicProjector` — `fast_jl`, the faster CUDA projector, failed to build in
+this env and wasn't chased further, so LESS's numbers here are *not* using its fastest
+available projector; LoGRA merged in from point 1/2 above, not recomputed a third time):
+
+| method | agg ρ | ms/sample |
+|---|---:|---:|
+| less_4B | +0.9606 | 483.5 |
+| logra_4B (r8) | +0.9129 | 82.4 |
+| influcoder_68m | +0.8335 | 2.2 |
+| logra_1.7B (r32) | +0.5209 | 47.1 |
+| less_1.7B | +0.6194 | 287.6 |
+| influcoder_150m | +0.7591 | 3.2 |
+| logra_0.6B (r32) | +0.2931 | 37.2 |
+| less_0.6B | +0.1706 | 213.1 |
+| untrained_68m | +0.2127 | 1.8 |
+| untrained_150m | +0.1490 | 3.0 |
+| rdsplus | -0.1259 | 32.3 |
+| tfidf | -0.2510 | 0.5 |
+
+**The curve is visibly smoother than §5.4's original table** — no method's proxy family
+reverses sign non-monotonically the way LESS's and LoGRA's r8 rows did originally (both
+LESS and LoGRA now descend cleanly through their 3 sizes); see the figure below.
+
+**InfluCoder anomaly — found and fixed, not just reported.** First pass through this
+table, `influcoder_68m`/`150m` scored *worse* than their own untrained baselines (-0.025
+vs. +0.215; +0.022 vs. +0.152) — a reversal of InfluCoder's entire value proposition.
+Root-caused (not just re-observed): `baselines/scaling_sweep.py`'s `train_features()`
+cached the expensive train-side gradient features under a key that includes model, train
+size, rank, seed, and eval size — but **not the pool name**. `fig1` (dolly pool) and
+`fig1_dolci` (dolci-instruct pool) are identical on every other field of that key, so
+whichever preset's `train_features()` call ran second (confirmed by file mtimes: `fig1`
+07-22 17:29, `fig1_dolci` 07-23 05:08) silently reused the *first* preset's pool-side
+gradients. `distill()` then trained the encoder against a `targets` matrix whose column
+*j* described a completely different (dolly) text than the actual (dolci-instruct)
+`pool_texts[j]` it was embedding at that index — a scrambled label, not a hard one,
+collapsing all three encoder sizes uniformly (they share one `targets` matrix; `fig1`'s
+own three sizes, trained before the collision, all scored well: 0.782/0.760/0.810). This
+resolves and supersedes the `dolci-non-reproduction` memory's "docs say ~0.05, running
+code says ~0.78" contradiction — both numbers were real, from before vs. after the cache
+collision corrupted the checkpoint on disk; neither was a measurement bug.
+
+**Fix + reproduction:** `pool_slug = cfg.get("pool", "dolly")` added to the cache key.
+Retrained all three `fig1_dolci` encoders from scratch (`.venv_py311`, fixed key so no
+stale cache could hit) — every epoch, every size, healthy monotonic-loss / stable-quality
+curves, no collapse:
+
+| size | untrained (400x400) | best (400x400) | epoch | re-scored on 50x50 |
+|---|---:|---:|---:|---:|
+| 68m | +0.322 | +0.782 | 4/8 | +0.8335 |
+| 150m | +0.277 | +0.769 | 7/8 | +0.7591 |
+| 400m | +0.215 | +0.796 | 8/8 | (not in Part 1's table) |
+
+The 68m/150m re-scores above replace the collapsed rows in
+`vercors18_part1_50x50_table.json` in place (script:
+`.tuning_logs/rescore_influcoder_50x50.py`) — not appended as a caveat. The Python-version
+finding (checkpoint needs `.venv_py311`, `sentence-transformers>=5.2` requires Python
+≥3.10) is unrelated to the collapse and still stands as a separate, real environment note.
+
+**Figure:** `baselines/out/fig1_dolci/vercors18_part1_50x50_figure.png` (script:
+`.tuning_logs/plot_vercors18_part1.py`, draft/untracked). Same visual language as §5.5
+(categorical color by cost-class reusing this repo's validated palette, marker shape by
+family, size by model size, filled=trained/hollow=untrained, solid proxy-family
+connecting lines) except **log-x, not linear-x**: this table's cost range (0.5ms TF-IDF →
+483ms LESS-4B) spans ~3 orders of magnitude, and §5.5's own linear-x choice was already
+flagged (§11) as an axis-mismatch open item against the combined figure's sqrt-x — log-x
+was the more legible call for this specific spread, not a return to `plot_figure1.py`'s
+original convention by default.
+
+**Reproduce:**
+```bash
+cd /home/dkachler/year1/rebut_ie/influcoder
+export PYTHONPATH=$(pwd)
+export TOKENIZERS_PARALLELISM=false
+export BIG_GPU=1   # opt in to batched LoGRA
+
+# LoGRA only (4B/1.7B/0.6B x r8/r16/r32 sweep available as separate scripts):
+.venv_h100/bin/python .tuning_logs/vercors18_logra_50x50.py             # bs=1 baseline
+.venv_h100/bin/python .tuning_logs/vercors18_logra_batched_50x50.py     # r8, batched
+# (r16/r32 sweep: edit LOGRA_RANKS in the same file)
+
+# One-time, if the fig1_dolci InfluCoder checkpoints don't exist or predate the
+# train_features() pool-name cache-key fix (baselines/scaling_sweep.py):
+.venv_py311/bin/python -m baselines.train_fig1_encoders --preset fig1_dolci
+
+# Everything else (LESS/InfluCoder/untrained/RDS+/TF-IDF), merges in the LoGRA numbers
+# above from their JSON outputs rather than recomputing:
+.venv_py311/bin/python .tuning_logs/vercors18_part1_50x50.py   # needs Python >=3.10
+                                                                # for the InfluCoder
+                                                                # checkpoint's saved
+                                                                # sentence-transformers
+                                                                # version
+# (or, once influcoder_68m/150m are already in that table and only need
+# re-scoring against a newly retrained checkpoint:
+#  .venv_py311/bin/python .tuning_logs/rescore_influcoder_50x50.py)
+
+# Plot (no GPU needed):
+python3 .tuning_logs/plot_vercors18_part1.py
+```
 
 ## 6. Part 2: InfluCoder Training-Sample Scaling
 
@@ -694,9 +881,35 @@ Real vs. extrapolated, per method, at the five target sizes:
   are explicitly allowed** (previously said "never hold more than one active GPU job") —
   explicit user instruction this session. See §10.3 for the related `oarstat -J` bug this
   uncovered.
+- `baselines/logra/score.py` (later session, §5.6): `score_logra` gained a `big_gpu:
+  bool | None = None` param and module-level `BIG_GPU` env-var flag (default off) that
+  switches the pool/anchor `encode()` calls from the plain `batch_size=1` loop to
+  length-sorted batching with an auto-retry-on-OOM ladder (fresh model reload per retry,
+  not a resumed encode). Default behavior (`big_gpu`/`BIG_GPU` unset) is byte-for-byte
+  the old code path — nothing changes unless a caller opts in.
+- `FINDINGS.md`: corrected the "batching LoGRA is a real but unsafe lever" entry — it was
+  wrong (loss is sum-reduced, not batch-mean; see §5.6).
+- `baselines/logra/score.py` (later still, §5.6): `score_logra` gained a `compute_fim:
+  bool = True` param. Default preserves existing behavior exactly (every current caller
+  unaffected); `compute_fim=False` skips `_precondition`'s `torch.linalg.pinv` entirely,
+  which is trivial at rank=8 but scales as `rank**6` (FIM shape is `[n_blocks, rank**2,
+  rank**2]`) and dominates total cost at rank=32 — measured ~16x (585ms vs. 37ms/sample)
+  for a matrix nothing in this repo actually uses (`FINDINGS.md`: raw beats FIM
+  everywhere).
+- `baselines/scaling_sweep.py` (§5.6, the real bug this session's InfluCoder
+  investigation actually found): `train_features()`'s cache key gained a `pool_slug`
+  component. Without it, `fig1` (dolly pool) and `fig1_dolci` (dolci-instruct pool) —
+  identical on every other field of the key (model/train size/rank/seed/eval size) —
+  collided, so whichever preset ran `train_features()` second silently reused the first
+  preset's pool-side gradients. This corrupted the `fig1_dolci` InfluCoder checkpoints
+  (all three sizes, since they share one `targets` matrix) and is what the
+  `dolci-non-reproduction` memory's "docs say ~0.05, running code says ~0.78"
+  contradiction actually was. Fixed and the three checkpoints retrained clean (§5.6).
 
 None of these edits change any *existing* call site's behavior (every new parameter
-defaults to the old hardcoded value).
+defaults to the old hardcoded value) except the `scaling_sweep.py` cache-key fix, which
+is a correctness fix, not an additive one — a call that previously (silently, wrongly)
+cache-hit will now (correctly) recompute.
 
 ## 10. Where we got stuck — read this before repeating any of it
 
@@ -760,6 +973,14 @@ batch-mean-loss "diluting" LoGRA's per-sample gradient was WRONG — the loss is
 sum-reduced via `num_items_in_batch=1`). This finding is separate from and predates the
 current unified-table experiment, but explains why proxy models are believed to be a
 legitimate cost lever at all.
+
+**Update (§5.6):** a later, more skeptical pass on the same question found this needs
+qualifying, not retracting. The ~2x-from-batching mechanism above is real and reproduced
+again in §5.6 (1.6-2.8x depending on model size). But at `batch_size=1` — the convention
+this benchmark's tables actually report under — the 1.7B→0.6B gain is nearly zero
+(~2%, noise-level), so "smaller proxy = faster" is only true once batching is in the
+picture; stated as a blanket claim about proxy models at the benchmark's default settings,
+it overclaims. See §5.6's self-critique for the full breakdown.
 
 ### 10.3 GPU discovery bug: `oarstat -J`'s `assigned_hostnames` field is always `None`
 
@@ -853,3 +1074,26 @@ homes and DO need an explicit copy step if you ever run something there.
   (§4.2.2) — the amortization numbers (§7.5) should be re-measured at whatever the real
   experiment's actual InfluCoder training-set size ends up being, with repeated trials
   for noise estimation, before being quoted as final.
+- ~~InfluCoder's 68m/150m collapse~~ **RESOLVED (§5.6).** Root cause:
+  `train_features()`'s cache key was missing the pool name, so `fig1` and `fig1_dolci`
+  (identical on every other key field) collided — whichever ran `train_features()`
+  second silently trained against the other's pool-side gradients. Fixed
+  (`baselines/scaling_sweep.py`) and all three `fig1_dolci` encoders retrained clean:
+  68m +0.782, 150m +0.769, 400m +0.796 (all 400x400, epoch-by-epoch stable, no collapse
+  anywhere). This is also what the `dolci-non-reproduction` memory's contradiction
+  actually was — not an unexplained flake, a before/after-corruption pair.
+- **0.6B LoGRA proxy's rank sweep disagrees with the historical "pinned near zero at
+  every rank" finding (§5.6)** — at r32 it reached +0.29, monotonically improving with
+  rank. One seed on a 50x50 slice; get 2-3 more seeds at r32 before updating
+  `FINDINGS.md`'s claim outright.
+- **`fast_jl` (LESS's fast CUDA projector) failed to build in the vercors18 venvs** (both
+  `.venv_h100` and `.venv_py311`) — its `setup.py` needs `torch` importable at build time,
+  which pip's build-isolation venv doesn't have; retry with `pip install --no-build-isolation
+  fast_jl` if LESS's §5.6 numbers (currently on the slower pure-torch `BasicProjector`
+  fallback) need to be faster/more representative of LESS's best case.
+- **`BIG_GPU`'s batch-size search (§5.6) is a quick halving search from an arbitrary
+  starting guess (32), not a principled max-batch-size or token-budget search** — the
+  8/12/25 batch sizes found for 4B/1.7B/0.6B are "a size that fits," not necessarily each
+  model's true ceiling. A real token-budget implementation (see the now-superseded
+  `logra-batching-not-dilution` memory's original recommendation) would likely do better
+  and make the per-model-size comparison less confounded by search-path arbitrariness.
