@@ -10,50 +10,57 @@
     "gpu": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
     "torch_version": "2.13.0+cu130",
     "logra_note": "4B at r8, proxies at r32 -- merged from the batched runs, not recomputed here",
-    "influcoder_note": "68m/150m re-scored after fixing train_features()'s pool-name cache-key collision (see FINDINGS.md) and retraining; the collapsed rows from the corrupted checkpoint are replaced, not appended."
+    "influcoder_note": "68m/150m re-scored after fixing train_features()'s pool-name cache-key collision (see FINDINGS.md) and retraining; the collapsed rows from the corrupted checkpoint are replaced, not appended.",
+    "less_note": "re-scored with fast_jl's CudaProjector (built from source, TORCH_CUDA_ARCH_LIST patched to 12.0+PTX for this GPU) -- prior numbers used TRAK's BasicProjector fallback (fast_jl was not installed), see EXP1.md."
   },
   "methods": {
     "less_4B": {
-      "per_anchor_mean": 0.9069810324129651,
-      "per_anchor_std": 0.07092765438071398,
-      "aggregated": 0.9606242496998798,
-      "flops_total": 0,
+      "per_anchor_mean": 0.9066852340936374,
+      "per_anchor_std": 0.047833620757552715,
+      "aggregated": 0.9530372148859544,
+      "flops_total": 54116587929600,
       "flops_measured": 0,
-      "flops_analytic": 0,
-      "flops_per_sample": 0.0,
-      "inference_time_s": 48.34670284599997,
-      "load_time_s": 3.4406044620554894,
-      "time_per_sample_ms": 483.4670284599997,
+      "flops_analytic": 54116587929600,
+      "flops_per_sample": 541165879296.0,
+      "inference_time_s": 15.799879485042766,
+      "load_time_s": 3.4091795270796865,
+      "time_per_sample_ms": 157.99879485042766,
       "n_samples": 100,
-      "cost_notes": []
+      "cost_notes": [
+        "LESS CudaProjector: 2*33030144*8192*100"
+      ]
     },
     "less_1.7B": {
-      "per_anchor_mean": 0.5392518607442977,
-      "per_anchor_std": 0.08921874962968906,
-      "aggregated": 0.6193997599039616,
-      "flops_total": 0,
+      "per_anchor_mean": 0.5390809123649459,
+      "per_anchor_std": 0.0844005077964779,
+      "aggregated": 0.6174789915966385,
+      "flops_total": 28561532518400,
       "flops_measured": 0,
-      "flops_analytic": 0,
-      "flops_per_sample": 0.0,
-      "inference_time_s": 28.7644409800414,
-      "load_time_s": 2.8224889698904008,
-      "time_per_sample_ms": 287.644409800414,
+      "flops_analytic": 28561532518400,
+      "flops_per_sample": 285615325184.0,
+      "inference_time_s": 12.278701883042231,
+      "load_time_s": 2.67658431106247,
+      "time_per_sample_ms": 122.78701883042231,
       "n_samples": 100,
-      "cost_notes": []
+      "cost_notes": [
+        "LESS CudaProjector: 2*17432576*8192*100"
+      ]
     },
     "less_0.6B": {
-      "per_anchor_mean": 0.07597599039615846,
-      "per_anchor_std": 0.1260273128537093,
-      "aggregated": 0.17061224489795918,
-      "flops_total": 0,
+      "per_anchor_mean": 0.028129651860744297,
+      "per_anchor_std": 0.15366622441607547,
+      "aggregated": 0.08436974789915966,
+      "flops_total": 16535624089600,
       "flops_measured": 0,
-      "flops_analytic": 0,
-      "flops_per_sample": 0.0,
-      "inference_time_s": 21.31238955585286,
-      "load_time_s": 2.170497233979404,
-      "time_per_sample_ms": 213.1238955585286,
+      "flops_analytic": 16535624089600,
+      "flops_per_sample": 165356240896.0,
+      "inference_time_s": 10.691140031907707,
+      "load_time_s": 2.2359094151761383,
+      "time_per_sample_ms": 106.91140031907707,
       "n_samples": 100,
-      "cost_notes": []
+      "cost_notes": [
+        "LESS CudaProjector: 2*10092544*8192*100"
+      ]
     },
     "influcoder_68m": {
       "per_anchor_mean": 0.7829128451380553,

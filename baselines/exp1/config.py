@@ -64,7 +64,10 @@ LESS_RANK = 16              # uniform across LESS's 3 model sizes (NOT the
                            # OOM saga for why)
 LESS_PROJ_DIM = 8192
 LESS_LORA_ALPHA = 512
-LESS_LORA_DROPOUT = 0.1
+LESS_LORA_DROPOUT = 0.0     # was 0.1 with the model left in train() mode --
+                           # injected dropout noise into every LESS gradient,
+                           # unlike GT/LoGRA which are both deterministic
+                           # (eval mode, dropout=0); see EXP1.md's fix writeup
 LESS_BLOCK_SIZE = 16        # NOT the collect_grads default of 128 -- also part
                            # of the OOM fix; MUST be passed explicitly at every
                            # call site, it is not a shared library default

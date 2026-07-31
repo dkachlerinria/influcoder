@@ -388,25 +388,67 @@ the 4B anchor, r32 for both proxies)** instead of uniform r8 — a deliberate re
 the §3/§4.1 convention for this re-run specifically (that convention's own numbers, §5.4,
 are unaffected and remain as documented).
 
-**3. Full Part 1 method sweep, redone on vercors18 at the same 50x50 slice** (LESS via
+**3. Full Part 1 method sweep, redone on vercors18 at the same 50x50 slice** (~~LESS via
 `traker`'s `BasicProjector` — `fast_jl`, the faster CUDA projector, failed to build in
 this env and wasn't chased further, so LESS's numbers here are *not* using its fastest
-available projector; LoGRA merged in from point 1/2 above, not recomputed a third time):
+available projector~~ **fast_jl now built and in use, see point 4 below — table updated**;
+LoGRA merged in from point 1/2 above, not recomputed a third time):
 
 | method | agg ρ | ms/sample |
 |---|---:|---:|
-| less_4B | +0.9606 | 483.5 |
+| less_4B | +0.9530 | 158.0 |
 | logra_4B (r8) | +0.9129 | 82.4 |
 | influcoder_68m | +0.8335 | 2.2 |
 | logra_1.7B (r32) | +0.5209 | 47.1 |
-| less_1.7B | +0.6194 | 287.6 |
+| less_1.7B | +0.6175 | 122.8 |
 | influcoder_150m | +0.7591 | 3.2 |
 | logra_0.6B (r32) | +0.2931 | 37.2 |
-| less_0.6B | +0.1706 | 213.1 |
+| less_0.6B | +0.0844 | 106.9 |
 | untrained_68m | +0.2127 | 1.8 |
 | untrained_150m | +0.1490 | 3.0 |
 | rdsplus | -0.1259 | 32.3 |
 | tfidf | -0.2510 | 0.5 |
+
+**4. `fast_jl` doesn't build out of the box on this GPU, but it's fixable and worth
+fixing.** Asked directly ("are we maximizing LESS's inference speed, are we using the
+proxies properly") this session, and the answer for the projector half was no: `fast_jl`
+(TRAK's custom CUDA kernel projector — see `less_embeds.py`'s `get_trak_projector`, which
+tries it first and only falls back to `BasicProjector`, a plain `torch.mm`, on failure)
+was never installed, so every LESS number anywhere in this doc through point 3 above used
+the slow fallback. Trying to build it revealed why: `fast_jl`'s `setup.py` hardcodes
+`TORCH_CUDA_ARCH_LIST="7.0+PTX"` (Volta), and this CUDA 13.0 toolchain refuses to target
+`compute_70` at all on a Blackwell (compute capability 12.0) GPU — `nvcc fatal:
+Unsupported gpu architecture 'compute_70'`. Not a real incompatibility: patched that one
+line to `"12.0+PTX"` and it built and installed cleanly (`pip install --no-build-isolation`
+against the downloaded sdist), verified with a standalone `fast_jl.project_rademacher_8`
+call before touching any real scoring code.
+
+Re-scored just the 3 LESS rows above with `CudaProjector` now live (`.tuning_logs/
+rescore_less_fastjl.py`, everything else in the table untouched):
+
+| model | ms/sample (BasicProjector) | ms/sample (CudaProjector) | speedup | agg ρ before → after |
+|---|---:|---:|---:|---|
+| 4B | 483.5 | 158.0 | 3.06x | +0.9606 → +0.9530 |
+| 1.7B | 287.6 | 122.8 | 2.34x | +0.6194 → +0.6175 |
+| 0.6B | 213.1 | 106.9 | 1.99x | +0.1706 → +0.0844 |
+
+Quality is essentially unchanged for 4B/1.7B (noise-level, same magnitude as the
+projection-draw variance documented elsewhere in this doc); 0.6B's number — already
+near-zero and already flagged as noisy at this rank — moved more (+0.17 → +0.08), most
+likely a different random projection draw rather than a real regression, since nothing
+about the gradient computation itself changed, only the projector implementation. Not
+independently reseeded/replicated across multiple draws to confirm; flagged rather than
+asserted.
+
+**Still true, and now a bigger relative issue since the projector got cheaper:** LESS
+remains completely unbatched (`score_less`'s `DataLoader` is hardcoded to `batch_size=1`
+— see `baselines/less/score.py`), unlike LoGRA's `BIG_GPU` path. This session's port of
+`less_embeds.py` also dropped the original file's `functorch.{grad,
+make_functional_with_buffers, vmap}` imports as "unused" — that's the standard
+per-sample-gradient batching primitive LESS would need to batch its backward pass, removed
+rather than wired up. And LESS's proxies (1.7B/0.6B) still use a rank pinned uniform to the
+4B's (`LESS_RANK`/`lora_rank=16` at every size) without ever being swept per-proxy the way
+LoGRA's r32 discovery happened — both are open, not yet chased.
 
 **The curve is visibly smoother than §5.4's original table** — no method's proxy family
 reverses sign non-monotonically the way LESS's and LoGRA's r8 rows did originally (both
@@ -483,6 +525,17 @@ export BIG_GPU=1   # opt in to batched LoGRA
 # (or, once influcoder_68m/150m are already in that table and only need
 # re-scoring against a newly retrained checkpoint:
 #  .venv_py311/bin/python .tuning_logs/rescore_influcoder_50x50.py)
+
+# One-time, for LESS to use fast_jl's CudaProjector instead of the slow
+# BasicProjector fallback (needed on any GPU whose compute capability isn't
+# Volta/7.0 -- patch fast_jl's own hardcoded TORCH_CUDA_ARCH_LIST before building):
+#   curl -sL https://files.pythonhosted.org/packages/b3/89/c3251ac89c2d79dbb5bbc64817d6d9349feddfbc4f2d78147f823f9881bc/fast_jl-0.1.3.tar.gz | tar xz
+#   sed -i 's/TORCH_CUDA_ARCH_LIST"\]="7.0+PTX"/TORCH_CUDA_ARCH_LIST"]="12.0+PTX"/' fast_jl-0.1.3/setup.py
+#   # ^ 12.0 is this GPU's capability (torch.cuda.get_device_capability(0)); adjust per-GPU
+#   .venv_py311/bin/pip install --no-build-isolation fast_jl-0.1.3/
+# (or, once LESS rows are already in the table and only need re-scoring after
+# fast_jl becomes available:
+#  .venv_py311/bin/python .tuning_logs/rescore_less_fastjl.py)
 
 # Plot (no GPU needed):
 python3 .tuning_logs/plot_vercors18_part1.py
@@ -1086,11 +1139,23 @@ homes and DO need an explicit copy step if you ever run something there.
   every rank" finding (§5.6)** — at r32 it reached +0.29, monotonically improving with
   rank. One seed on a 50x50 slice; get 2-3 more seeds at r32 before updating
   `FINDINGS.md`'s claim outright.
-- **`fast_jl` (LESS's fast CUDA projector) failed to build in the vercors18 venvs** (both
-  `.venv_h100` and `.venv_py311`) — its `setup.py` needs `torch` importable at build time,
-  which pip's build-isolation venv doesn't have; retry with `pip install --no-build-isolation
-  fast_jl` if LESS's §5.6 numbers (currently on the slower pure-torch `BasicProjector`
-  fallback) need to be faster/more representative of LESS's best case.
+- ~~`fast_jl` (LESS's fast CUDA projector) failed to build in the vercors18 venvs~~
+  **RESOLVED (§5.6 point 4)** — the real blocker wasn't build-isolation, it was
+  `fast_jl`'s own hardcoded `TORCH_CUDA_ARCH_LIST="7.0+PTX"` (Volta) rejecting this
+  CUDA 13.0 toolchain on a Blackwell GPU; patched to `"12.0+PTX"` and it builds and
+  installs cleanly. LESS's 3 rows re-scored with the real `CudaProjector`: 1.99x-3.06x
+  faster (worse for smaller models, matching LoGRA's launch-bound pattern), quality
+  within noise except 0.6B (+0.17 → +0.08, likely just a different random draw).
+- **LESS is still completely unbatched, and its proxies' rank was never swept per-size**
+  — both raised directly ("are we maximizing LESS's inference speed, are we using the
+  proxies properly") and neither chased yet. `score_less`'s `DataLoader` hardcodes
+  `batch_size=1` (no `BIG_GPU`-equivalent exists for LESS); the ported `less_embeds.py`
+  dropped the original file's `functorch.{grad, make_functional_with_buffers, vmap}`
+  imports as "unused," which is the standard machinery for batching per-sample gradients
+  LESS would need. Separately, `LESS_RANK=16` is pinned uniform across LESS's 4B/1.7B/0.6B
+  sizes exactly like LoGRA's rank was before the r32 proxy discovery (§5.6 point 2) — never
+  independently swept per-proxy to check whether the same "rank-starved, not pinned near
+  zero" story applies here too.
 - **`BIG_GPU`'s batch-size search (§5.6) is a quick halving search from an arbitrary
   starting guess (32), not a principled max-batch-size or token-budget search** — the
   8/12/25 batch sizes found for 4B/1.7B/0.6B are "a size that fits," not necessarily each

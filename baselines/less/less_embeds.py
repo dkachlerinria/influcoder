@@ -213,7 +213,14 @@ def collect_grads(
     # projected_gradients
     full_grads = []  # full gradients
     projected_grads = []
-    model.train()
+    # NOTE (influcoder port): the original LESS script called model.train()
+    # here unconditionally. That's wrong for this repo's use: it silently
+    # re-enables LoRA dropout regardless of what the caller set up (score_less
+    # -> load_base_with_fresh_lora now sets eval()+dropout=0.0 deliberately, to
+    # match GradientFeaturizer/LoGra's deterministic-gradient convention), so a
+    # forced .train() here would inject dropout noise into every "gradient"
+    # this function returns. Removed; this function now respects whatever
+    # train/eval mode the caller already put the model in.
     count = 0
     for batch in tqdm(dataloader, total=len(dataloader)):
         count += 1

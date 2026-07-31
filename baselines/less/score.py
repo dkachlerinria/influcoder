@@ -9,6 +9,12 @@ Same gradient source and projection dim as influcoder's ground truth; the
 difference is LESS uses a raw random projection of a *large* LoRA (rank 128,
 the LESS-paper default) with no distillation, so its number isolates "random
 projection of gradients" from influcoder's learned encoder.
+
+lora_dropout defaults to 0.0 (and load_base_with_fresh_lora puts the model in
+eval() mode) for deterministic per-sample gradients, matching the GT
+featurizer (influcoder/gradients.py) and LoGra (modeling_logra.py) -- this
+was previously 0.1 with the model left in train() mode, injecting dropout
+noise into every LESS gradient that the other two methods didn't have.
 """
 
 from __future__ import annotations
@@ -22,7 +28,7 @@ from baselines.less.model_utils import load_base_with_fresh_lora
 
 
 def score_less(splits, model_name: str, proj_dim: int = 8192, max_len: int = 1024,
-               lora_rank: int = 128, lora_alpha: int = 512, lora_dropout: float = 0.1,
+               lora_rank: int = 128, lora_alpha: int = 512, lora_dropout: float = 0.0,
                lora_seed: int = 0, project_interval: int = 8, block_size: int = 128,
                gradient_checkpointing: bool = False, attn_implementation: str = "eager",
                meter=None) -> torch.Tensor:
