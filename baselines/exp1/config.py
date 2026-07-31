@@ -30,6 +30,17 @@ SEED = 0
 # --------------------------------------------------------------------------- #
 PRESET = "fig1_dolci"  # BBH anchors x tasksource/dolci-instruct pool
 
+# Which config profile is active -- every output path (checkpoints, JSON
+# results) is namespaced under this, specifically so switching EXP1_CONFIG
+# can never silently reuse-or-skip an artifact produced under a DIFFERENT
+# parameter set (rank, restore_best, etc.) at the same cfg.PRESET path.
+# Previously all three parts' outputs lived at paths keyed only by PRESET --
+# identical whether EXP1_CONFIG was set or not, so e.g. Part 1's checkpoint-
+# reuse check or Part 2's resume-skip logic could silently treat a
+# historical-config artifact as already-done under biggpu. Real risk, not
+# hypothetical -- see EXP1_BIGGPU_FINAL.md's code-review pass.
+PROFILE = "default"
+
 # Canonical eval size. Both Part 1 and Part 2 default to this (the full
 # fig1_dolci eval) so their numbers are comparable; pass a smaller --n_eval on
 # either part's CLI for a fast peek, but the DEFAULT is now the same for both
@@ -90,6 +101,18 @@ LOGRA_RANK = 8              # uniform across LoGRA's 3 model sizes (NOT the
 LOGRA_MLP_ONLY = True
 LOGRA_TARGET_MODULES = ["q_proj", "k_proj", "v_proj", "o_proj",
                         "gate_proj", "up_proj", "down_proj"]
+LOGRA_BIG_GPU = False       # score_logra's length-sorted-batching opt-in (see
+                           # EXP1.md section 5.6) -- off here to preserve this
+                           # config's original bs=1 numbers exactly; the
+                           # BIG_GPU_FINAL config turns this on
+LOGRA_COMPUTE_FIM = False   # score_logra computes an extra FIM-preconditioned
+                           # score by default (compute_fim=True) that costs
+                           # ~16x more at higher rank and that NOTHING in this
+                           # repo actually uses -- run_logra() only ever reads
+                           # variants["logra_raw"] (FINDINGS.md: "raw beats FIM
+                           # everywhere"). False here so every ms/sample number
+                           # this package reports reflects only the score
+                           # that's actually used, not wasted computation.
 
 LOGRA_MODEL_SIZES = {
     "4B": GT_MODEL,
@@ -127,3 +150,25 @@ INFLUCODER_ENCODER_MAX_LEN = MAX_LEN
 # to distill() (it only controls what gets restored into the returned encoder
 # object) but the reported metric is always epoch_metrics[-1].
 INFLUCODER_SELECT_BEST_ON = "aggregated"
+
+# Whether distill() actually RESTORES enc to that best epoch afterwards (True
+# here, preserving this config's original behavior: the reported metric was
+# already always epoch_metrics[-1], but the saved/returned `enc` itself was
+# still silently restored to best-epoch underneath that). BIG_GPU_FINAL sets
+# this False so the saved checkpoint's actual weights match the epoch-8
+# metric being reported -- see distill()'s docstring in influcoder/encoder.py.
+INFLUCODER_RESTORE_BEST_EPOCH = True
+
+# --------------------------------------------------------------------------- #
+# Part 3 scope (EXP1.md section 4.2.2/4.2.6): a deliberate, explicit scope
+# reduction from the full LESS_MODEL_SIZES/LOGRA_MODEL_SIZES families and
+# N_TRAIN_A/N_TRAIN_P above, NOT an oversight -- LESS/LoGRA are "waaaay too
+# expensive" to time across every proxy size, and this part only needs SOME
+# InfluCoder training-set size to measure setup-cost amortization, not the
+# real one. Kept here (not hardcoded in part3.py) so BIG_GPU_FINAL can widen
+# both without part3.py's code changing at all.
+# --------------------------------------------------------------------------- #
+PART3_LESS_MODELS = {"4B": GT_MODEL}
+PART3_LOGRA_MODELS = {"1.7B": "Qwen/Qwen3-1.7B"}
+PART3_N_TRAIN_A = 250
+PART3_N_TRAIN_P = 500

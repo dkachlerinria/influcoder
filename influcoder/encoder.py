@@ -110,17 +110,24 @@ def distill(enc, anchor_texts: list[str], pool_texts: list[str],
             targets: torch.Tensor, epochs: int, k_anchors: int = 8,
             m_candidates: int = 16, lr: float = 5e-5, seed: int = 0,
             hard_ratio: float = 0.5, epoch_eval=None,
-            select_best_on: str = "per_anchor_mean",
+            select_best_on: str = "per_anchor_mean", restore_best: bool = True,
             grad_accum_steps: int = 1, alpha: float = 0.5,
             temperature: float = 0.05, weight_decay: float = 0.01,
             max_grad_norm: float = 1.0, warmup_frac: float = 0.1,
             lr_schedule: str = "linear", hard_ratio_end: float | None = None) -> dict:
     """Each step embeds a block of k anchors x m candidates (mixed
     random/hard-negative) and regresses the cosine block onto the gradient
-    targets. Restores the encoder to whichever epoch scored best on
-    `epoch_eval` (by `select_best_on`) before returning -- eval Spearman is
-    noisy at these sample sizes and reliably peaks then degrades, so
-    reporting the last epoch is reporting overfitting, not the method.
+    targets. By default (`restore_best=True`), restores the encoder to
+    whichever epoch scored best on `epoch_eval` (by `select_best_on`) before
+    returning -- eval Spearman is noisy at these sample sizes and reliably
+    peaks then degrades, so reporting the last epoch is reporting
+    overfitting, not the method. Pass `restore_best=False` to keep whatever
+    the encoder actually looks like after the full `epochs` budget instead --
+    e.g. EXP1's BIG_GPU_FINAL config, which reports fixed-epoch-8 metrics and
+    wants the SAVED checkpoint to match that (previously only the reported
+    metric was pinned to the last epoch; the actual `enc`/saved checkpoint
+    was still silently best-epoch-restored underneath it regardless of what
+    got printed).
 
     `grad_accum_steps` accumulates over that many blocks before stepping, so
     the effective batch is k_anchors * grad_accum_steps. This matters more
@@ -211,8 +218,11 @@ def distill(enc, anchor_texts: list[str], pool_texts: list[str],
             enc.train()
         print(msg)
 
-    if best_state is not None:
+    if best_state is not None and restore_best:
         enc.load_state_dict(best_state)
         print(f"  restored best checkpoint: epoch {best_epoch + 1} "
               f"({select_best_on}={best_score:+.4f})")
+    elif best_state is not None:
+        print(f"  restore_best=False: keeping final-epoch ({epochs}) weights "
+              f"(best was epoch {best_epoch + 1}, {select_best_on}={best_score:+.4f})")
     return {"epoch_losses": epoch_losses, "epoch_metrics": epoch_metrics, "best_epoch": best_epoch}

@@ -10,7 +10,11 @@ from __future__ import annotations
 from baselines.common import ground_truth
 from baselines.scaling_sweep import train_features
 
-from . import config as cfg
+import os as _os
+if _os.environ.get("EXP1_CONFIG") == "biggpu":
+    from . import config_biggpu as cfg  # BIG_GPU_FINAL_EXP1 -- see that module's docstring
+else:
+    from . import config as cfg
 
 
 def load_gt_and_splits(n_eval: int | None = None):

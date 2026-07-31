@@ -42,22 +42,50 @@ import torch
 
 from baselines.common import tokenized_dataset
 from baselines.less.less_embeds import collect_grads
+from baselines.logra.score import BIG_GPU_START_BATCH_SIZE, encode_sorted
 from influcoder.data import load_bbh, load_dolci_instruct
 from influcoder.encoder import embed
 from influcoder.gradients import GradientFeaturizer
 
-from . import config as cfg
+import os as _os
+if _os.environ.get("EXP1_CONFIG") == "biggpu":
+    from . import config_biggpu as cfg  # BIG_GPU_FINAL_EXP1 -- see that module's docstring
+else:
+    from . import config as cfg
 from . import methods, train
 
 LESS_LOGRA_SIZES = [100, 1_000]
 INFLUCODER_PROCESS_SIZES = [100, 1_000, 10_000]
-N_TRAIN_A_SMALL = 250   # deliberately tiny exploratory set -- NOT config.N_TRAIN_A;
-N_TRAIN_P_SMALL = 500   # this part times setup cost, doesn't measure quality,
-                       # so a small, cheap-to-collect set is the point (see
-                       # EXP1.md section 4.2.2)
+# Model-size scope and InfluCoder training-set size for this part now come
+# from config.py (PART3_LESS_MODELS/PART3_LOGRA_MODELS/PART3_N_TRAIN_A/
+# PART3_N_TRAIN_P) instead of being hardcoded here -- see config.py's
+# docstring for that section. The historical single-model scope (LESS-4B,
+# LoGRA-1.7B) and tiny 250x500 exploratory set are config.py's values;
+# BIG_GPU_FINAL widens both to match Parts 1/2's full families and real
+# training-set size.
 
-OUT_LESS_LOGRA = Path("baselines/out") / cfg.PRESET / "exp1_part3_less_logra.json"
-OUT_INFLUCODER = Path("baselines/out") / cfg.PRESET / "exp1_part3_influcoder.json"
+OUT_LESS_LOGRA = Path("baselines/out") / cfg.PRESET / cfg.PROFILE / "exp1_part3_less_logra.json"
+OUT_INFLUCODER = Path("baselines/out") / cfg.PRESET / cfg.PROFILE / "exp1_part3_influcoder.json"
+
+
+def _logra_encode(logra, ds, is_test):
+    """Same batching convention as run_logra (cfg.LOGRA_BIG_GPU), but a
+    simpler retry: halves batch size on OOM without reloading the model --
+    fine here since this part loads one LoGra instance and times multiple
+    sizes against it sequentially (unlike score_logra, which loads fresh per
+    call). Falls back to plain batch_size=1 when LOGRA_BIG_GPU is off."""
+    if not cfg.LOGRA_BIG_GPU:
+        return logra.encode(ds, batch_size=1, is_test=is_test)
+    bs = BIG_GPU_START_BATCH_SIZE
+    while True:
+        try:
+            return encode_sorted(logra, ds, bs, is_test=is_test)
+        except torch.cuda.OutOfMemoryError:
+            torch.cuda.empty_cache()
+            if bs <= 1:
+                raise
+            bs = max(1, bs // 2)
+            print(f"  [BIG_GPU] OOM at batch_size={bs * 2} -- retrying at batch_size={bs}")
 
 
 def get_samples(n, seed):
@@ -68,54 +96,62 @@ def time_less_logra():
     samples_by_n = {n: get_samples(n, seed=7) for n in LESS_LOGRA_SIZES}
     print(f"loaded dolci-instruct samples: {[len(samples_by_n[n]) for n in LESS_LOGRA_SIZES]}\n")
 
-    print(f"########## LESS {cfg.GT_MODEL} (r={cfg.LESS_RANK}, {cfg.ATTN}) ##########")
-    t_load0 = time.perf_counter()
-    tok, model = methods.load_less_model(cfg.GT_MODEL)
-    torch.cuda.synchronize()
-    less_load_s = time.perf_counter() - t_load0
+    less_results = {}
+    for label, model_name in cfg.PART3_LESS_MODELS.items():
+        print(f"########## LESS {model_name} (r={cfg.LESS_RANK}, {cfg.ATTN}) ##########")
+        t_load0 = time.perf_counter()
+        tok, model = methods.load_less_model(model_name)
+        torch.cuda.synchronize()
+        less_load_s = time.perf_counter() - t_load0
 
-    less_points = []
-    for n in LESS_LOGRA_SIZES:
-        dl = torch.utils.data.DataLoader(
-            tokenized_dataset(tok, samples_by_n[n], cfg.MAX_LEN), batch_size=1, shuffle=False)
-        torch.cuda.synchronize()
-        t0 = time.perf_counter()
-        collect_grads(dl, model, proj_dim=cfg.LESS_PROJ_DIM, adam_optimizer_state=None,
-                     gradient_type="sgd", project_interval=cfg.LESS_PROJECT_INTERVAL,
-                     block_size=cfg.LESS_BLOCK_SIZE)
-        torch.cuda.synchronize()
-        elapsed = time.perf_counter() - t0
-        less_points.append({"n": n, "process_time_s": elapsed, "ms_per_sample": 1000 * elapsed / n})
-        print(f"  LESS: n={n:6d}  {elapsed:8.2f}s  {1000 * elapsed / n:8.2f} ms/sample")
-    del model
-    torch.cuda.empty_cache()
+        less_points = []
+        for n in LESS_LOGRA_SIZES:
+            dl = torch.utils.data.DataLoader(
+                tokenized_dataset(tok, samples_by_n[n], cfg.MAX_LEN), batch_size=1, shuffle=False)
+            torch.cuda.synchronize()
+            t0 = time.perf_counter()
+            collect_grads(dl, model, proj_dim=cfg.LESS_PROJ_DIM, adam_optimizer_state=None,
+                         gradient_type="sgd", project_interval=cfg.LESS_PROJECT_INTERVAL,
+                         block_size=cfg.LESS_BLOCK_SIZE)
+            torch.cuda.synchronize()
+            elapsed = time.perf_counter() - t0
+            less_points.append({"n": n, "process_time_s": elapsed, "ms_per_sample": 1000 * elapsed / n})
+            print(f"  LESS {label}: n={n:6d}  {elapsed:8.2f}s  {1000 * elapsed / n:8.2f} ms/sample")
+        del model
+        torch.cuda.empty_cache()
+        less_results[label] = {"model": model_name, "load_time_s": less_load_s, "points": less_points}
 
-    print(f"\n########## LoGRA Qwen/Qwen3-1.7B (r={cfg.LOGRA_RANK}, {cfg.ATTN}) ##########")
-    t_load0 = time.perf_counter()
-    logra = methods.load_logra_model("Qwen/Qwen3-1.7B")
-    torch.cuda.synchronize()
-    logra_load_s = time.perf_counter() - t_load0
+    logra_results = {}
+    for label, model_name in cfg.PART3_LOGRA_MODELS.items():
+        print(f"\n########## LoGRA {model_name} (r={cfg.LOGRA_RANK}, {cfg.ATTN}, "
+              f"big_gpu={cfg.LOGRA_BIG_GPU}) ##########")
+        t_load0 = time.perf_counter()
+        logra = methods.load_logra_model(model_name)
+        torch.cuda.synchronize()
+        logra_load_s = time.perf_counter() - t_load0
 
-    logra_points = []
-    for n in LESS_LOGRA_SIZES:
-        ds = tokenized_dataset(logra.tokenizer, samples_by_n[n], cfg.MAX_LEN)
-        torch.cuda.synchronize()
-        t0 = time.perf_counter()
-        logra.encode(ds, batch_size=1, is_test=False, show_progress_bar=False)
-        torch.cuda.synchronize()
-        elapsed = time.perf_counter() - t0
-        logra_points.append({"n": n, "process_time_s": elapsed, "ms_per_sample": 1000 * elapsed / n})
-        print(f"  LoGRA: n={n:6d}  {elapsed:8.2f}s  {1000 * elapsed / n:8.2f} ms/sample")
-    del logra
-    torch.cuda.empty_cache()
+        logra_points = []
+        for n in LESS_LOGRA_SIZES:
+            ds = tokenized_dataset(logra.tokenizer, samples_by_n[n], cfg.MAX_LEN)
+            torch.cuda.synchronize()
+            t0 = time.perf_counter()
+            _logra_encode(logra, ds, is_test=False)
+            torch.cuda.synchronize()
+            elapsed = time.perf_counter() - t0
+            logra_points.append({"n": n, "process_time_s": elapsed, "ms_per_sample": 1000 * elapsed / n})
+            print(f"  LoGRA {label}: n={n:6d}  {elapsed:8.2f}s  {1000 * elapsed / n:8.2f} ms/sample")
+        del logra
+        torch.cuda.empty_cache()
+        logra_results[label] = {"model": model_name, "load_time_s": logra_load_s, "points": logra_points}
 
     OUT_LESS_LOGRA.parent.mkdir(parents=True, exist_ok=True)
     OUT_LESS_LOGRA.write_text(json.dumps({
         "config": {"max_len": cfg.MAX_LEN, "attn": cfg.ATTN, "sizes": LESS_LOGRA_SIZES,
-                  "less_model": cfg.GT_MODEL, "less_rank": cfg.LESS_RANK,
-                  "logra_model": "Qwen/Qwen3-1.7B", "logra_rank": cfg.LOGRA_RANK},
-        "less": {"load_time_s": less_load_s, "points": less_points},
-        "logra": {"load_time_s": logra_load_s, "points": logra_points},
+                  "less_rank": cfg.LESS_RANK, "logra_rank": cfg.LOGRA_RANK,
+                  "logra_big_gpu": cfg.LOGRA_BIG_GPU,
+                  "less_models": cfg.PART3_LESS_MODELS, "logra_models": cfg.PART3_LOGRA_MODELS},
+        "less": less_results,
+        "logra": logra_results,
     }, indent=2))
     print(f"\nwrote {OUT_LESS_LOGRA}")
 
@@ -124,9 +160,9 @@ def time_influcoder():
     encoder_model = cfg.ENCODER_MODELS["68m"]
 
     print(f"########## (A) collect data: {cfg.GT_MODEL} (r={cfg.GT_LORA_RANK}) "
-          f"grad targets, {N_TRAIN_A_SMALL}x{N_TRAIN_P_SMALL} ##########")
-    anchors = load_bbh("data/eval/bbh", seed=11)[:N_TRAIN_A_SMALL]
-    pool = load_dolci_instruct(seed=11, max_docs=N_TRAIN_P_SMALL)[:N_TRAIN_P_SMALL]
+          f"grad targets, {cfg.PART3_N_TRAIN_A}x{cfg.PART3_N_TRAIN_P} ##########")
+    anchors = load_bbh("data/eval/bbh", seed=11)[:cfg.PART3_N_TRAIN_A]
+    pool = load_dolci_instruct(seed=11, max_docs=cfg.PART3_N_TRAIN_P)[:cfg.PART3_N_TRAIN_P]
 
     t0 = time.perf_counter()
     feat = GradientFeaturizer(cfg.GT_MODEL, lora_rank=cfg.GT_LORA_RANK, lora_seed=cfg.SEED,
@@ -136,12 +172,12 @@ def time_influcoder():
     feat.close()
     torch.cuda.synchronize()
     collect_s = time.perf_counter() - t0
-    print(f"  collect: {collect_s:.1f}s for {N_TRAIN_A_SMALL}+{N_TRAIN_P_SMALL}"
-          f"={N_TRAIN_A_SMALL + N_TRAIN_P_SMALL} samples\n")
+    print(f"  collect: {collect_s:.1f}s for {cfg.PART3_N_TRAIN_A}+{cfg.PART3_N_TRAIN_P}"
+          f"={cfg.PART3_N_TRAIN_A + cfg.PART3_N_TRAIN_P} samples\n")
     targets = g_a @ g_p.T
 
     print(f"########## (B) train InfluCoder 68m, {cfg.INFLUCODER_EPOCHS} epochs, "
-          f"{N_TRAIN_A_SMALL}x{N_TRAIN_P_SMALL} ##########")
+          f"{cfg.PART3_N_TRAIN_A}x{cfg.PART3_N_TRAIN_P} ##########")
     # No eval_anchor_texts/eval_pool_texts/gt passed -- this part times setup
     # cost, never quality, so no epoch_eval callback gets built at all.
     t0 = time.perf_counter()
@@ -178,7 +214,7 @@ def time_influcoder():
         "config": {"grad_model": cfg.GT_MODEL, "gt_lora_rank": cfg.GT_LORA_RANK,
                   "encoder_model": encoder_model, "epochs": cfg.INFLUCODER_EPOCHS,
                   "hard_ratio": cfg.INFLUCODER_HARD_RATIO, "lr": cfg.INFLUCODER_LR,
-                  "n_train_anchors": N_TRAIN_A_SMALL, "n_train_pool": N_TRAIN_P_SMALL},
+                  "n_train_anchors": cfg.PART3_N_TRAIN_A, "n_train_pool": cfg.PART3_N_TRAIN_P},
         "collect_time_s": collect_s, "train_time_s": train_s,
         "setup_time_s": setup_s, "process_points": process_points,
     }, indent=2))

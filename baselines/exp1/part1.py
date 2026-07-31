@@ -27,11 +27,15 @@ from pathlib import Path
 from baselines.cost import CostMeter, summarize, sync
 from baselines.common import report
 
-from . import config as cfg
+import os as _os
+if _os.environ.get("EXP1_CONFIG") == "biggpu":
+    from . import config_biggpu as cfg  # BIG_GPU_FINAL_EXP1 -- see that module's docstring
+else:
+    from . import config as cfg
 from . import data, methods, train
 
-ENC_DIR = Path("runs_out") / cfg.PRESET
-OUT = Path("baselines/out") / cfg.PRESET / "exp1_part1.json"
+ENC_DIR = Path("runs_out") / cfg.PRESET / cfg.PROFILE
+OUT = Path("baselines/out") / cfg.PRESET / cfg.PROFILE / "exp1_part1.json"
 
 
 def ensure_checkpoint(size: str, encoder_model: str, splits, full_gt_eval_texts, retrain: bool):

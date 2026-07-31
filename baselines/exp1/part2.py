@@ -30,11 +30,15 @@ from pathlib import Path
 
 from influcoder.metrics import spearman_metrics
 
-from . import config as cfg
+import os as _os
+if _os.environ.get("EXP1_CONFIG") == "biggpu":
+    from . import config_biggpu as cfg  # BIG_GPU_FINAL_EXP1 -- see that module's docstring
+else:
+    from . import config as cfg
 from . import data, methods, train
 
-OUT = Path("baselines/out") / cfg.PRESET / "exp1_part2.json"
-PART1_OUT = Path("baselines/out") / cfg.PRESET / "exp1_part1.json"
+OUT = Path("baselines/out") / cfg.PRESET / cfg.PROFILE / "exp1_part2.json"
+PART1_OUT = Path("baselines/out") / cfg.PRESET / cfg.PROFILE / "exp1_part1.json"
 DEFAULT_SIZES = [25, 50, 100, 250, 500, 750, 1000, cfg.N_TRAIN_A]
 
 

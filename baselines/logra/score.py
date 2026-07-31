@@ -72,7 +72,7 @@ LOGRA_TARGET_MODULES = ["q_proj", "k_proj", "v_proj", "o_proj",
                         "gate_proj", "up_proj", "down_proj"]
 
 
-def _encode_sorted(logra, ds, batch_size, is_test):
+def encode_sorted(logra, ds, batch_size, is_test):
     """Length-sort `ds` before calling logra.encode() (keeps padding waste low
     within a batch), then un-sort the returned [N, k] embeddings back to
     `ds`'s original order."""
@@ -135,9 +135,9 @@ def score_logra(splits, grad_model: str, lora_rank: int = 8, mlp_only: bool = Tr
 
             # Order matters: corpus first (accumulates FIM), then anchors.
             if big_gpu:
-                pool_embeds = _encode_sorted(logra, pool_ds, bs, is_test=False)
+                pool_embeds = encode_sorted(logra, pool_ds, bs, is_test=False)
                 train_fim = logra.fim
-                raw_anchor_embeds = _encode_sorted(logra, anchor_ds, bs, is_test=False)
+                raw_anchor_embeds = encode_sorted(logra, anchor_ds, bs, is_test=False)
             else:
                 pool_embeds = logra.encode(pool_ds, batch_size=bs, is_test=False)
                 train_fim = logra.fim

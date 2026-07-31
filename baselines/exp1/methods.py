@@ -19,7 +19,11 @@ from baselines.rdsplus.score import score_rdsplus
 from baselines.semantic.score import score_semantic
 from baselines.tfidf.score import score_tfidf
 
-from . import config as cfg
+import os as _os
+if _os.environ.get("EXP1_CONFIG") == "biggpu":
+    from . import config_biggpu as cfg  # BIG_GPU_FINAL_EXP1 -- see that module's docstring
+else:
+    from . import config as cfg
 
 
 # --------------------------------------------------------------------------- #
@@ -40,7 +44,8 @@ def run_logra(splits, model_name: str, meter=None):
     variants = score_logra(
         splits, model_name, lora_rank=cfg.LOGRA_RANK, mlp_only=cfg.LOGRA_MLP_ONLY,
         max_len=cfg.MAX_LEN, target_modules=cfg.LOGRA_TARGET_MODULES,
-        seed=cfg.SEED, attn_implementation=cfg.ATTN, meter=meter)
+        seed=cfg.SEED, attn_implementation=cfg.ATTN, big_gpu=cfg.LOGRA_BIG_GPU,
+        compute_fim=cfg.LOGRA_COMPUTE_FIM, meter=meter)
     return variants["logra_raw"]
 
 

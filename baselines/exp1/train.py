@@ -15,7 +15,11 @@ import torch
 from influcoder.encoder import distill, embed, load_encoder
 from influcoder.metrics import spearman_metrics
 
-from . import config as cfg
+import os as _os
+if _os.environ.get("EXP1_CONFIG") == "biggpu":
+    from . import config_biggpu as cfg  # BIG_GPU_FINAL_EXP1 -- see that module's docstring
+else:
+    from . import config as cfg
 
 
 def train_influcoder(encoder_model: str, train_anchor_texts: list[str],
@@ -25,7 +29,8 @@ def train_influcoder(encoder_model: str, train_anchor_texts: list[str],
                      epochs: int | None = None,
                      hard_ratio: float | None = None, lr: float | None = None,
                      seed: int | None = None, encoder_max_len: int | None = None,
-                     select_best_on: str | None = None):
+                     select_best_on: str | None = None,
+                     restore_best: bool | None = None):
     """Load a fresh encoder and distill it against `targets`.
 
     Every keyword defaults to the canonical value in `config.py` -- callers
@@ -45,10 +50,15 @@ def train_influcoder(encoder_model: str, train_anchor_texts: list[str],
 
     Returns (enc, log, final_metrics, untrained_metrics). `final_metrics` is
     always `log["epoch_metrics"][epochs - 1]` -- the LAST epoch's metrics, per
-    the canonical epoch-selection convention (config.INFLUCODER_SELECT_BEST_ON
-    still controls what `enc` itself gets restored to internally by
-    `distill()`, but the metrics returned here are always final-epoch, never
-    best-epoch -- see config.py's docstring). `untrained_metrics` is the same
+    the canonical epoch-selection convention. Whether `enc` itself (and
+    therefore any checkpoint saved from it) also ends up at that same final
+    epoch, rather than being silently restored to a different "best" epoch
+    underneath the reported metric, is controlled by `restore_best`
+    (defaults to `config.INFLUCODER_RESTORE_BEST_EPOCH` -- True preserves this
+    config's original behavior, BIG_GPU_FINAL sets it False so the saved
+    weights actually match the epoch-8 number being reported). `select_best_on`
+    only picks WHICH per-epoch metric counts as "best" when restore_best=True;
+    it's a no-op when restore_best=False. `untrained_metrics` is the same
     eval computed once before training starts (both are None if no eval_*
     args were given).
     """
@@ -58,6 +68,7 @@ def train_influcoder(encoder_model: str, train_anchor_texts: list[str],
     seed = cfg.INFLUCODER_SEED if seed is None else seed
     encoder_max_len = cfg.INFLUCODER_ENCODER_MAX_LEN if encoder_max_len is None else encoder_max_len
     select_best_on = cfg.INFLUCODER_SELECT_BEST_ON if select_best_on is None else select_best_on
+    restore_best = cfg.INFLUCODER_RESTORE_BEST_EPOCH if restore_best is None else restore_best
 
     enc = load_encoder(encoder_model, max_seq_len=encoder_max_len)
 
@@ -70,7 +81,8 @@ def train_influcoder(encoder_model: str, train_anchor_texts: list[str],
     untrained_metrics = epoch_eval() if has_eval else None
     log = distill(enc, train_anchor_texts, train_pool_texts, targets,
                  epochs=epochs, hard_ratio=hard_ratio, lr=lr, seed=seed,
-                 epoch_eval=epoch_eval, select_best_on=select_best_on)
+                 epoch_eval=epoch_eval, select_best_on=select_best_on,
+                 restore_best=restore_best)
     final_metrics = log["epoch_metrics"][epochs - 1] if has_eval else None
     return enc, log, final_metrics, untrained_metrics
 
