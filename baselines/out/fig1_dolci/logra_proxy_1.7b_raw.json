@@ -1,0 +1,8 @@
+{
+  "grad_model": "Qwen/Qwen3-1.7B",
+  "rank": 32,
+  "preset": "fig1_dolci",
+  "per_anchor_mean": 0.4941219679747371,
+  "aggregated": 0.5950698441865261,
+  "elapsed_s": 235.6
+}

@@ -1,0 +1,38 @@
+method: InfluCoder
+# Supported methods: Grad_Dot, Grad_Sim, LESS, DataInf, EKFAC, InfluCoder
+# (InfluCoder is run via methods/influcoder_attribute.py, not methods/dattri.py --
+#  see that script's docstring)
+
+task: "Toxicity/Bias"
+subset: "XSTest-response-Het"
+# Supported subsets:
+#   - XSTest-response-Het, XSTest-response-Hom
+#   - ToxicChat-Het, ToxicChat-Hom
+#   - XSTest-Het, XSTest-Hom
+
+base_model_path: "EleutherAI/pythia-1b"
+checkpoint: "DataAttributionEval/Pythia-1b-XSTest-response-Het"
+device: "cuda"
+
+##################################
+# InfluCoder hyperparameters
+# encoder_model: bi-encoder distilled to reproduce teacher-gradient cosine
+# proj_dim: teacher gradient projection dim (matches this benchmark's own LESS proj_dim)
+# n_teacher_train: how many train examples get real (expensive) gradient features
+#   computed, to build the distillation targets -- the rest are only ever embedded
+# n_eval_train: held-out train examples (disjoint from n_teacher_train) used only
+#   to report a Spearman fidelity number during training, not part of the saved scores
+encoder_model: "jhu-clsp/ettin-encoder-68m"
+encoder_max_len: 1024
+max_len: 1024
+proj_dim: 8192
+n_teacher_train: 500
+n_eval_train: 250
+epochs: 8
+hard_ratio: 0.5
+lr: 5.0e-5
+seed: 0
+select_best_on: "aggregated"
+##################################
+
+save_path: ./results/toxicity-bias-influcoder/

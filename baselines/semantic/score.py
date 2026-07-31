@@ -17,14 +17,22 @@ import torch.nn.functional as F
 
 
 def score_semantic(splits, encoder_model: str, max_len: int = 512,
-                   batch_size: int = 32, meter=None) -> torch.Tensor:
+                   batch_size: int = 32, attn_implementation: str = "eager",
+                   meter=None) -> torch.Tensor:
     from sentence_transformers import SentenceTransformer
 
     model = SentenceTransformer(encoder_model,
-                                model_kwargs={"attn_implementation": "eager"})
+                                model_kwargs={"attn_implementation": attn_implementation})
     model.max_seq_length = max_len
     if torch.cuda.is_available():
         model.to("cuda")
+    # Throwaway forward pass to force CUDA kernel/SDPA-path compilation before
+    # timing starts. Without this, whichever model of a given architecture
+    # happens to run FIRST in the process eats that one-time cost inside its
+    # own "inference" time (model_ready() only excludes load/instantiation,
+    # not first-call kernel warm-up), making it look artificially much slower
+    # than an identical architecture scored right after it in the same process.
+    model.encode(["warmup"], batch_size=1, show_progress_bar=False)
     if meter is not None:
         meter.model_ready()
 

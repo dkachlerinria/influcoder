@@ -1,0 +1,45 @@
+{
+  "config": {
+    "preset": "fig1_dolci",
+    "grad_model": "Qwen/Qwen3-4B",
+    "gt_shape": [
+      400,
+      400
+    ],
+    "seed": 0
+  },
+  "methods": {
+    "logra_raw": {
+      "per_anchor_mean": 0.77015795863976,
+      "per_anchor_std": 0.14870795677457885,
+      "aggregated": 0.8939755873474208,
+      "flops_total": 1453326336,
+      "flops_measured": 0,
+      "flops_analytic": 1453326336,
+      "flops_per_sample": 1816657.92,
+      "inference_time_s": 285.128092748113,
+      "load_time_s": 79.65725868393201,
+      "time_per_sample_ms": 356.4101159351412,
+      "n_samples": 800,
+      "cost_notes": [
+        "logra_fim pinv: 252 blocks x 64^3"
+      ]
+    },
+    "logra_fim": {
+      "per_anchor_mean": 0.20868956120809748,
+      "per_anchor_std": 0.08871099764450065,
+      "aggregated": 0.26896293101831886,
+      "flops_total": 1453326336,
+      "flops_measured": 0,
+      "flops_analytic": 1453326336,
+      "flops_per_sample": 1816657.92,
+      "inference_time_s": 285.128092748113,
+      "load_time_s": 79.65725868393201,
+      "time_per_sample_ms": 356.4101159351412,
+      "n_samples": 800,
+      "cost_notes": [
+        "logra_fim pinv: 252 blocks x 64^3"
+      ]
+    }
+  }
+}

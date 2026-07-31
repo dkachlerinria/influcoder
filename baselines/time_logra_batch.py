@@ -20,22 +20,21 @@ import time
 
 import torch
 
-from baselines.common import ground_truth
+from baselines.common import PRESETS, ground_truth
 from baselines.cost import sync
 from baselines.logra.score import score_logra
-
-PRESET = "fig1"
 
 
 def main():
     ap = argparse.ArgumentParser()
+    ap.add_argument("--preset", default="fig1", choices=list(PRESETS))
     ap.add_argument("--grad_model", default="Qwen/Qwen3-4B")
     ap.add_argument("--rank", type=int, default=8)
     ap.add_argument("--batch_sizes", type=int, nargs="+", default=[1, 4, 8, 16])
     ap.add_argument("--attn_implementation", default="sdpa")
     args = ap.parse_args()
 
-    gt, splits, cfg = ground_truth(PRESET, seed=0, grad_model="Qwen/Qwen3-4B", lora_rank=16)
+    gt, splits, cfg = ground_truth(args.preset, seed=0, grad_model="Qwen/Qwen3-4B", lora_rank=16)
     n_samples = gt.shape[0] + gt.shape[1]
 
     ref = None

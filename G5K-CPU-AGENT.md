@@ -32,6 +32,18 @@ That message means *preempted / job ended*, not a network problem.
 
 ---
 
+## 1b. Multiple GPU jobs in parallel are fine
+
+You are **not** limited to one active GPU-bearing job at a time (see `G5K.md` rule 1) —
+each is still `gpu=1`, but holding several at once across sites/nodes is normal. Useful
+when a long full-scale measurement is running on one job and you want a quick isolated
+probe (e.g. a handful of samples to test a config change) without waiting for it or
+risking contention on the same GPU. Keep each job's id/site/node/log path distinct so
+polling doesn't cross-contaminate — a launcher script per job (`run_<name>.sh`, cd'd into
+the repo, absolute log path) plus a separate Monitor per job works well.
+
+---
+
 ## 2. Besteffort gets preempted constantly — design for it
 
 There is **no priority GPU queue** for us at Grenoble (`p3` is CPU-only; that is what the brain runs on).

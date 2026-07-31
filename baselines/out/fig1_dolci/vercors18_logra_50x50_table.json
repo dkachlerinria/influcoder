@@ -1,0 +1,64 @@
+{
+  "config": {
+    "preset": "fig1_dolci",
+    "n_eval": 50,
+    "gt_model": "Qwen/Qwen3-4B",
+    "gt_lora_rank": 16,
+    "logra_rank": 8,
+    "attn": "sdpa",
+    "max_len": 1024,
+    "seed": 0,
+    "gpu": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+    "torch_version": "2.8.0+cu128"
+  },
+  "methods": {
+    "logra_4B": {
+      "per_anchor_mean": 0.8260321728691475,
+      "per_anchor_std": 0.07925973130569468,
+      "aggregated": 0.914141656662665,
+      "flops_total": 1453326336,
+      "flops_measured": 0,
+      "flops_analytic": 1453326336,
+      "flops_per_sample": 14533263.36,
+      "inference_time_s": 12.92949829180725,
+      "load_time_s": 2.604175499174744,
+      "time_per_sample_ms": 129.2949829180725,
+      "n_samples": 100,
+      "cost_notes": [
+        "logra_fim pinv: 252 blocks x 64^3"
+      ]
+    },
+    "logra_1.7B": {
+      "per_anchor_mean": 0.1887481392557023,
+      "per_anchor_std": 0.1978155566876513,
+      "aggregated": 0.3248499399759904,
+      "flops_total": 1130364928,
+      "flops_measured": 0,
+      "flops_analytic": 1130364928,
+      "flops_per_sample": 11303649.28,
+      "inference_time_s": 9.785512520000339,
+      "load_time_s": 17.663839441956952,
+      "time_per_sample_ms": 97.85512520000339,
+      "n_samples": 100,
+      "cost_notes": [
+        "logra_fim pinv: 196 blocks x 64^3"
+      ]
+    },
+    "logra_0.6B": {
+      "per_anchor_mean": -0.10555774309723889,
+      "per_anchor_std": 0.11608798997258447,
+      "aggregated": -0.13978391356542613,
+      "flops_total": 1130364928,
+      "flops_measured": 0,
+      "flops_analytic": 1130364928,
+      "flops_per_sample": 11303649.28,
+      "inference_time_s": 9.585011162096635,
+      "load_time_s": 7.926497992826626,
+      "time_per_sample_ms": 95.85011162096635,
+      "n_samples": 100,
+      "cost_notes": [
+        "logra_fim pinv: 196 blocks x 64^3"
+      ]
+    }
+  }
+}

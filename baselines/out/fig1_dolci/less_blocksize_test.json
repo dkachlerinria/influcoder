@@ -1,0 +1,16 @@
+{
+  "bs16": {
+    "block_size": 16,
+    "ms_per_sample": 1563.3508021497012,
+    "peak_gb": 12.297153024,
+    "n": 60,
+    "ok": true
+  },
+  "bs32": {
+    "block_size": 32,
+    "ms_per_sample": 1515.619399099766,
+    "peak_gb": 13.347908096,
+    "n": 60,
+    "ok": true
+  }
+}

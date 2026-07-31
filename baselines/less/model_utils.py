@@ -29,16 +29,20 @@ def load_base_with_fresh_lora(
     lora_target_modules: str = "all-linear",
     lora_rank: int = 128,
     lora_alpha: int = 512,
-    lora_dropout: float = 0.1,
+    lora_dropout: float = 0.0,
     seed: int = 0,
     torch_dtype: Any = torch.bfloat16,
+    gradient_checkpointing: bool = False,
+    attn_implementation: str = "eager",
 ) -> PeftModel:
-    # attn_implementation="eager" pinned for FLOP-measurement reproducibility
-    # AND because torch.utils.flop_counter's SDPA handler crashes on GQA models
-    # (asserts Q/K/V have equal head counts; Qwen3 etc. have fewer K/V heads).
-    # See KNOWN_ISSUES.txt for details.
+    # attn_implementation defaults to "eager", historically pinned for FLOP-
+    # measurement reproducibility AND because torch.utils.flop_counter's SDPA
+    # handler crashes on GQA models (asserts Q/K/V have equal head counts;
+    # Qwen3 etc. have fewer K/V heads). See KNOWN_ISSUES.txt for details. Only
+    # matters when wrapping calls in baselines.cost.flop_counter() -- callers
+    # doing plain wall-clock timing are free to pass "sdpa".
     base_model = AutoModelForCausalLM.from_pretrained(
-        model_name, torch_dtype=torch_dtype, attn_implementation="eager"
+        model_name, torch_dtype=torch_dtype, attn_implementation=attn_implementation
     )
     base_model.to("cuda")
 
@@ -57,6 +61,26 @@ def load_base_with_fresh_lora(
         bias="none",
     )
     model = get_peft_model(base_model, peft_config)
+    # eval() + lora_dropout=0.0 -> deterministic per-sample gradients, matching
+    # GradientFeaturizer (influcoder/gradients.py) and LoGra (modeling_logra.py),
+    # both of which score against the same GT. Previously left in train() mode
+    # with dropout=0.1 (collect_grads' own model.train() call, now removed --
+    # see less_embeds.py), so every LESS gradient was a noisy sample from a
+    # randomly-dropped-out sub-network instead of the deterministic gradient
+    # the cosine-similarity-vs-GT comparison assumes.
+    model.eval()
+
+    if gradient_checkpointing:
+        # Trades compute for memory (recomputes forward activations during
+        # backward instead of storing them) -- same loss, same gradients,
+        # just lower peak activation memory. enable_input_require_grads() is
+        # required with a frozen base + LoRA: checkpointing's recompute trick
+        # needs the checkpoint's input tensor to require grad, but the base
+        # model's embeddings output doesn't by default when only LoRA params
+        # are trainable.
+        model.gradient_checkpointing_enable()
+        model.enable_input_require_grads()
+        model.config.use_cache = False
 
     trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
     total = sum(p.numel() for p in model.parameters())

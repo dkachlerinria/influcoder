@@ -1,0 +1,34 @@
+{
+  "logra_proxy_1.7B_r8": {
+    "per_anchor_mean": 0.24555098943251075,
+    "per_anchor_std": 0.18214262933027842,
+    "aggregated": 0.42985768661054125,
+    "flops_total": 1130364928,
+    "flops_measured": 0,
+    "flops_analytic": 1130364928,
+    "flops_per_sample": 1412956.16,
+    "inference_time_s": 183.29525891004596,
+    "load_time_s": 32.79263107501902,
+    "time_per_sample_ms": 229.11907363755745,
+    "n_samples": 800,
+    "cost_notes": [
+      "logra_fim pinv: 196 blocks x 64^3"
+    ]
+  },
+  "logra_proxy_0.6B_r8": {
+    "per_anchor_mean": 0.017431606626084437,
+    "per_anchor_std": 0.10167085395708743,
+    "aggregated": 0.019923687023043892,
+    "flops_total": 1130364928,
+    "flops_measured": 0,
+    "flops_analytic": 1130364928,
+    "flops_per_sample": 1412956.16,
+    "inference_time_s": 179.05673033301719,
+    "load_time_s": 2.1848946599056944,
+    "time_per_sample_ms": 223.82091291627148,
+    "n_samples": 800,
+    "cost_notes": [
+      "logra_fim pinv: 196 blocks x 64^3"
+    ]
+  }
+}

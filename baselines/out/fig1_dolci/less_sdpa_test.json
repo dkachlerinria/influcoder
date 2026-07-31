@@ -1,0 +1,18 @@
+{
+  "sdpa_ckptFalse": {
+    "attn": "sdpa",
+    "gradient_checkpointing": false,
+    "ms_per_sample": 1241.5232929599006,
+    "peak_gb": 21.556284928,
+    "n": 100,
+    "ok": true
+  },
+  "eager_ckptTrue": {
+    "attn": "eager",
+    "gradient_checkpointing": true,
+    "ms_per_sample": 1487.205009200843,
+    "peak_gb": 12.29507328,
+    "n": 100,
+    "ok": true
+  }
+}

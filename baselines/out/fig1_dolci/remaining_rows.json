@@ -1,0 +1,16 @@
+{
+  "less_r16": {
+    "per_anchor_mean": 0.8916091691626449,
+    "per_anchor_std": 0.04809602572569796,
+    "aggregated": 0.950678754242214,
+    "flops_total": 0,
+    "flops_measured": 0,
+    "flops_analytic": 0,
+    "flops_per_sample": 0.0,
+    "inference_time_s": 1125.4174904390238,
+    "load_time_s": 5.049205039977096,
+    "time_per_sample_ms": 1406.7718630487798,
+    "n_samples": 800,
+    "cost_notes": []
+  }
+}

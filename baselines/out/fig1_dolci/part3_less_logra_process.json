@@ -1,0 +1,44 @@
+{
+  "config": {
+    "max_len": 1024,
+    "attn": "sdpa",
+    "sizes": [
+      100,
+      1000
+    ],
+    "less_model": "Qwen/Qwen3-4B",
+    "less_rank": 16,
+    "logra_model": "Qwen/Qwen3-1.7B",
+    "logra_rank": 8
+  },
+  "less": {
+    "load_time_s": 74.06409417104442,
+    "points": [
+      {
+        "n": 100,
+        "process_time_s": 112.31357194890734,
+        "ms_per_sample": 1123.1357194890734
+      },
+      {
+        "n": 1000,
+        "process_time_s": 1091.6697904709727,
+        "ms_per_sample": 1091.6697904709727
+      }
+    ]
+  },
+  "logra": {
+    "load_time_s": 35.7663009109674,
+    "points": [
+      {
+        "n": 100,
+        "process_time_s": 21.83759987098165,
+        "ms_per_sample": 218.37599870981649
+      },
+      {
+        "n": 1000,
+        "process_time_s": 217.6265363979619,
+        "ms_per_sample": 217.6265363979619
+      }
+    ]
+  }
+}

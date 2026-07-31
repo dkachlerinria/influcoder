@@ -1,0 +1,45 @@
+{
+  "config": {
+    "preset": "fig1_dolci",
+    "n_eval": 400,
+    "encoder_model": "jhu-clsp/ettin-encoder-68m",
+    "gt_model": "Qwen/Qwen3-4B",
+    "gt_lora_rank": 16,
+    "epochs": 8,
+    "hard_ratio": 0.0,
+    "seed": 0,
+    "ratio": "1:2"
+  },
+  "points": [
+    {
+      "n_train_anchors": 125,
+      "n_train_pool": 250,
+      "n_train_total": 375,
+      "untrained_agg": 0.31713546571238593,
+      "agg": 0.6432996456227851,
+      "per_anchor_mean": 0.5963497012229546,
+      "best_epoch": 8,
+      "elapsed_s": 100.6
+    },
+    {
+      "n_train_anchors": 175,
+      "n_train_pool": 350,
+      "n_train_total": 525,
+      "untrained_agg": 0.31713546571238593,
+      "agg": 0.7052095325595784,
+      "per_anchor_mean": 0.6516215131452696,
+      "best_epoch": 8,
+      "elapsed_s": 102.1
+    },
+    {
+      "n_train_anchors": 1500,
+      "n_train_pool": 3000,
+      "n_train_total": 4500,
+      "untrained_agg": 0.31713546571238593,
+      "agg": 0.7661676635478971,
+      "per_anchor_mean": 0.7229519211603926,
+      "best_epoch": 8,
+      "elapsed_s": 538.4
+    }
+  ]
+}

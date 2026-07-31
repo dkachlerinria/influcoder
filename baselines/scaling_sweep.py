@@ -55,7 +55,21 @@ def train_features(splits, cfg, grad_model, lora_rank, seed):
     # gradients against its OWN (mismatched) text samples -- this actually
     # happened once and produced a fully scrambled, near-zero-Spearman
     # training run before the bug was caught.
-    cache = CACHE_DIR / (f"trainfeat_{model_slug}_{n_a}x{n_p}_r{lora_rank}_s{seed}"
+    #
+    # Pool name goes in the key too (CONFIRMED real, not hypothetical: this is
+    # exactly what corrupted the fig1_dolci InfluCoder checkpoints -- see
+    # FINDINGS.md). "fig1" (dolly pool) and "fig1_dolci" (dolci_instruct pool)
+    # are identical on every OTHER field of this key -- same model/train
+    # size/rank/seed/eval size -- so without the pool name, whichever preset's
+    # train_features() call ran second silently reused the first preset's
+    # pool-side gradients. distill() then trained against a `targets` matrix
+    # whose column j described a completely different text than the actual
+    # pool_texts[j] it was embedding -- a scrambled label, not a hard one,
+    # collapsing all three encoder sizes uniformly (they share one `targets`
+    # matrix). ground_truth()'s GT cache key already included `pool` and was
+    # never vulnerable to this; this key was the one place it was missing.
+    pool_slug = cfg.get("pool", "dolly")
+    cache = CACHE_DIR / (f"trainfeat_{model_slug}_{pool_slug}_{n_a}x{n_p}_r{lora_rank}_s{seed}"
                         f"_eval{cfg['n_eval_a']}x{cfg['n_eval_p']}.pt")
     if cache.exists():
         d = torch.load(cache)

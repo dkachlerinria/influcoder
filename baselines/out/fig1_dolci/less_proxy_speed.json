@@ -1,0 +1,23 @@
+{
+  "Qwen/Qwen3-4B": {
+    "model": "Qwen/Qwen3-4B",
+    "ms_per_sample": 1555.6266128337786,
+    "peak_gb": 12.297153024,
+    "n": 60,
+    "ok": true
+  },
+  "Qwen/Qwen3-1.7B": {
+    "model": "Qwen/Qwen3-1.7B",
+    "ms_per_sample": 837.0946998339301,
+    "peak_gb": 6.565974528,
+    "n": 60,
+    "ok": true
+  },
+  "Qwen/Qwen3-0.6B": {
+    "model": "Qwen/Qwen3-0.6B",
+    "ms_per_sample": 601.2903406498177,
+    "peak_gb": 3.784887808,
+    "n": 60,
+    "ok": true
+  }
+}

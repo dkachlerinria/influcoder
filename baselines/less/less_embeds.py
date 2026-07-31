@@ -159,6 +159,7 @@ def collect_grads(
     adam_optimizer_state: Optional[dict] = None,
     gradient_type: str = "adam",
     project_interval: int = 8,
+    block_size: int = 128,
 ):
     """
     Collects gradients from the model during evaluation and saves them to disk.
@@ -170,9 +171,12 @@ def collect_grads(
         adam_optimizer_state (dict): The optimizer state of adam optimizers. If None, the gradients will be collected without considering Adam optimization states.
         gradient_type (str): The type of gradients to collect. [adam | sign | sgd]
         project_interval (int): The interval for projection. For example, if project_interval=8, the gradients will be projected every 8 batches.
+        block_size (int): BasicProjector's column-chunk width -- a pure memory/throughput
+            knob (mathematically identical projection at any value), not a LESS config
+            parameter. Lower it to shrink the projector's [grad_dim, block_size] buffer
+            when grad_dim * block_size doesn't fit in memory.
     """
     model_id = 0  # model_id is used to draft the random seed for the projectors
-    block_size = 128  # fixed block size for the projectors
     projector_batch_size = 16  # batch size for the projectors
     torch.random.manual_seed(0)  # set the random seed for torch
 
@@ -209,7 +213,14 @@ def collect_grads(
     # projected_gradients
     full_grads = []  # full gradients
     projected_grads = []
-    model.train()
+    # NOTE (influcoder port): the original LESS script called model.train()
+    # here unconditionally. That's wrong for this repo's use: it silently
+    # re-enables LoRA dropout regardless of what the caller set up (score_less
+    # -> load_base_with_fresh_lora now sets eval()+dropout=0.0 deliberately, to
+    # match GradientFeaturizer/LoGra's deterministic-gradient convention), so a
+    # forced .train() here would inject dropout noise into every "gradient"
+    # this function returns. Removed; this function now respects whatever
+    # train/eval mode the caller already put the model in.
     count = 0
     for batch in tqdm(dataloader, total=len(dataloader)):
         count += 1
