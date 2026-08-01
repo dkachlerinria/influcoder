@@ -46,6 +46,7 @@ COUNTERFACT_MODULES = [
 TOXICITY_MODULES = [
     "methods.influcoder_attribute_noleak_toxicity",
     "methods.influcoder_attribute_noleak_toxicity_moredata",
+    "methods.influcoder_attribute_noleak_toxicity_wildguard",
 ]
 
 

@@ -107,11 +107,10 @@ local non-benign rows matched 1:1 by exact prompt+response text).
 
 Unlike CounterFact, XSTest-response is **nearly saturated**: of its 249 unmatched rows, 247 are
 "unharmful"/"prompt_safe" and only 2 are "harmful" — nowhere near enough fresh unsafe material
-to build query-analogs or positive candidates. (Checked and ruled out: `allenai/wildguardmix`,
-the same WildGuard team's larger 37,976-row prompt+response set, would have been the closest
-format/distribution match, but access is gated and not granted to this account; going back to
-raw `walledai/XSTest`/`Paul/XSTest` doesn't help either — its "unsafe" label pool is 200 total,
-197 already consumed, same 3-row remainder problem.)
+to build query-analogs or positive candidates. (Checked and ruled out at the time: raw
+`walledai/XSTest`/`Paul/XSTest` doesn't help either — its "unsafe" label pool is 200 total, 197
+already consumed, same 3-row remainder problem. `allenai/wildguardmix` was also gated and
+inaccessible at the time this section was first written — access was granted later; see §4.3.)
 
 Per explicit instruction, used **`lmsys/toxic-chat`** instead (`toxicchat0124` config, 746
 `toxicity=1` rows across train+test, confirmed 0 overlap with local prompts) — one of DATE-LM's
@@ -129,6 +128,31 @@ this external mix, then the full local train (10,187) + local ref (10) embedded 
 Also verified via `methods/audit_leakage.py` (see §4.1): 0 exact-prompt overlaps, 0 exact
 (prompt,response) pair overlaps against local train+ref, for both this script and the
 `_toxicity_moredata` variant in §6 (no `subject` field on this task, so that axis doesn't apply).
+
+### 4.3 Toxicity/Bias with WildGuardMix (closes the §4.2 distributional-match gap)
+
+`allenai/wildguardmix` access was granted to this account after §4.2 was written. Redone here as
+a **like-for-like swap of the toxic-side external source only** —
+`influcoder_attribute_noleak_toxicity_wildguard.py`, identical to §4.2's script (same
+`N_EXT_ANCHORS=40`/`N_EXT_BENIGN=300`/`N_EXT_TOXIC_POS=100`/`N_EVAL_BENIGN=100`/
+`N_EVAL_TOXIC=50`/`EPOCHS=8`/`HARD_RATIO=0.5`) except the toxic pool is drawn from WildGuardMix
+instead of ToxicChat, so the result is directly comparable to §4.2/§5.2's row.
+
+`wildguardmix`'s `wildguardtrain` config (86,759 rows) has `prompt`, `response`,
+`response_harm_label` ('harmful'/'unharmful', matching `xstest-response`'s
+`response_harmfulness` semantics directly — unlike ToxicChat, which only has prompt-level
+`toxicity`) among its fields. Toxic pool = rows with `response_harm_label == "harmful"` and a
+non-empty response: **8,368 usable rows** (0 overlap with local prompts) — over 11x ToxicChat's
+746, and the same WildGuard team/methodology as the local task's own `xstest-response` source,
+closing the distributional-match gap §4.2 disclosed.
+
+Verified leak-free via `methods/audit_leakage.py` (extended to cover this script): 0 exact-prompt
+overlaps, 0 exact (prompt,response) pair overlaps.
+
+**Result: AUPRC 0.4222** — essentially a wash against ToxicChat's 0.4242 (§5.2), very slightly
+*lower*, within run-to-run noise. A closer distributional match did not translate into a better
+score here. Kept as the honest result rather than an assumed improvement — see §5.2 for the full
+comparison table.
 
 ## 5. Results
 
@@ -164,7 +188,8 @@ of BM25/Rep-Sim, comparable to Grad Dot/DataInf/EKFAC/LESS on both metrics.
 | Version | AUPRC |
 |---|---|
 | Original (both leaks) | 0.4737 |
-| **Leak-free (ToxicChat-sourced external)** | **0.4242** |
+| **Leak-free (ToxicChat-sourced external, recommended)** | **0.4242** |
+| Leak-free (WildGuardMix-sourced external, §4.3) | 0.4222 |
 
 Paper baselines, Pythia-1B, XSTest-response column (Table 12, Heterogeneous):
 
@@ -176,11 +201,17 @@ Paper baselines, Pythia-1B, XSTest-response column (Table 12, Heterogeneous):
 | Rep-Sim | 0.580 |
 | Grad Sim | 0.601 |
 | LESS | 0.734 |
-| **InfluCoder (leak-free)** | **0.424** |
+| **InfluCoder (leak-free, ToxicChat)** | **0.424** |
+| **InfluCoder (leak-free, WildGuardMix)** | **0.422** |
 
-Same shape as Counterfact: ahead of Grad Dot/DataInf/EKFAC, behind Rep-Sim/Grad Sim/LESS.
-Remember the §4.2 caveat — this used a different-source external pool (ToxicChat, not
-XSTest-response), so it's a slightly less exact distributional match than the Counterfact fix.
+Same shape as Counterfact: ahead of Grad Dot/DataInf/EKFAC, behind Rep-Sim/Grad Sim/LESS,
+regardless of which external toxic source is used. The §4.2 distributional-match caveat has now
+been directly tested (§4.3): despite WildGuardMix being a substantially closer match to the local
+task's own source (same team/methodology, response-level harm labels, 8,368 vs. 746 usable rows),
+the result is a statistical wash, not an improvement — 0.4222 vs. 0.4242, a 0.002 gap well within
+run-to-run noise. Distributional match quality doesn't appear to be what's bottlenecking this
+number; whatever's capping InfluCoder below Rep-Sim/Grad Sim/LESS here isn't the toxic-source
+choice.
 
 ## 6. Ablation: more external samples, hard_ratio/epochs held fixed
 
@@ -276,16 +307,23 @@ cd EXP2-datelm
   --config configs/toxicity-bias.yaml \
   --score_path results/toxicity-bias-influcoder-noleak-moredata/InfluCoder.pt
 
+# §4.3 WildGuardMix variant (needs a GPU + HF auth granted access to allenai/wildguardmix)
+../.venv_py311/bin/python methods/influcoder_attribute_noleak_toxicity_wildguard.py
+../.venv_py311/bin/python evaluation/evaluate_application.py \
+  --config configs/toxicity-bias.yaml \
+  --score_path results/toxicity-bias-influcoder-noleak-wildguard/InfluCoder.pt
+
 # Independent leak audit (CPU-only, no GPU/model loading needed -- a couple minutes,
-# dominated by re-downloading/streaming the external pools). Checks all four runs above.
+# dominated by re-downloading/streaming the external pools). Checks all five runs above.
 ../.venv_h100/bin/python methods/audit_leakage.py
 ```
 
 ## 8. Open items
 
-- Toxicity/Bias's external pool (ToxicChat) is a weaker distributional match than Counterfact's
-  (different source dataset, not just disjoint rows of the same one). If `allenai/wildguardmix`
-  access is ever granted, redoing the toxicity fix against that source instead would close this
-  gap — same team/methodology as `xstest-response`, ~85x more prompt+response rows.
+- **RESOLVED:** `allenai/wildguardmix` access was granted and the toxicity fix was redone against
+  it (§4.3): AUPRC 0.4222 vs. ToxicChat's 0.4242 — a wash, not an improvement, despite the closer
+  distributional match. ToxicChat remains the recommended row in §5.2 (marginally higher, and
+  already the more thoroughly-exercised script); WildGuardMix is documented as an equally-valid
+  alternative with no meaningful score difference.
 - Only Pythia-1B has been leak-free-fixed. DATE-LM also reports Llama-3.2-1B and Llama-3.1-8B
   for both tasks; neither has been redone with external data yet.
