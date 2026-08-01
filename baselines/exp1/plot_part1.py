@@ -47,8 +47,12 @@ INK = "#0b0b0b"
 INK_MUTED = "#52514e"
 GRID = "#e3e2df"
 
-IN_PATH = Path("baselines/out") / cfg.PRESET / cfg.PROFILE / "exp1_part1.json"
-OUT_PATH = Path("baselines/out") / cfg.PRESET / cfg.PROFILE / "exp1_part1_figure"
+# Reads from the consolidated EXP1_results.json (written by
+# collect_results.py from Part 1/2/3's raw outputs), not exp1_part1.json
+# directly -- one file every plot script reads its numbers from, so there is
+# exactly one place to look to see what actually drove Figure 1.
+IN_RESULTS = Path("baselines/out") / cfg.PRESET / cfg.PROFILE / cfg.seed_dir(cfg.SEED) / "EXP1_results.json"
+OUT_PATH = Path("baselines/out") / cfg.PRESET / cfg.PROFILE / cfg.seed_dir(cfg.SEED) / "exp1_part1_figure"
 
 # (label, marker, size_pt, color, filled, family, size_rank)
 SPEC = {
@@ -81,14 +85,14 @@ OFFSETS = {
 }
 
 
-def main():
-    data = json.loads(IN_PATH.read_text())
+def draw(ax, data):
+    """Draw the full Part 1 cost-vs-quality panel onto `ax`. Factored out of
+    `main()` so `plot_figure1.py` can reuse this exact drawing code for its
+    combined panel instead of a second, driftable copy of it."""
     methods = data["methods"]
     n_eval = data["config"]["n_eval"]
     less_rank = data["config"]["less_rank"]
     logra_rank = data["config"]["logra_rank"]
-
-    fig, ax = plt.subplots(figsize=(8, 8))
 
     for family, color in [("less", C_GRAD), ("logra", C_GRAD)]:
         pts = sorted(
@@ -150,6 +154,11 @@ def main():
     ]
     ax.legend(handles=legend_elems, loc="lower right", fontsize=8, frameon=False)
 
+
+def main():
+    data = json.loads(IN_RESULTS.read_text())["part1"]
+    fig, ax = plt.subplots(figsize=(8, 8))
+    draw(ax, data)
     fig.tight_layout()
     fig.savefig(f"{OUT_PATH}.png", dpi=160)
     fig.savefig(f"{OUT_PATH}.pdf")

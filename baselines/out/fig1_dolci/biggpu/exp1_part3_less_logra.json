@@ -1,0 +1,74 @@
+{
+  "config": {
+    "max_len": 1024,
+    "attn": "sdpa",
+    "sizes": [
+      100,
+      1000
+    ],
+    "less_rank": 32,
+    "logra_rank": 32,
+    "logra_big_gpu": true,
+    "less_models": {
+      "1.7B": "Qwen/Qwen3-1.7B"
+    },
+    "logra_models": {
+      "1.7B": "Qwen/Qwen3-1.7B"
+    },
+    "rdsplus_model": "Qwen/Qwen3-4B"
+  },
+  "less": {
+    "1.7B": {
+      "model": "Qwen/Qwen3-1.7B",
+      "load_time_s": 2.633011508034542,
+      "points": [
+        {
+          "n": 100,
+          "process_time_s": 13.190278008114547,
+          "ms_per_sample": 131.90278008114547
+        },
+        {
+          "n": 1000,
+          "process_time_s": 122.58562520402484,
+          "ms_per_sample": 122.58562520402484
+        }
+      ]
+    }
+  },
+  "logra": {
+    "1.7B": {
+      "model": "Qwen/Qwen3-1.7B",
+      "load_time_s": 2.056440653046593,
+      "points": [
+        {
+          "n": 100,
+          "process_time_s": 4.399309230037034,
+          "ms_per_sample": 43.993092300370336
+        },
+        {
+          "n": 1000,
+          "process_time_s": 33.68291750992648,
+          "ms_per_sample": 33.68291750992648
+        }
+      ]
+    }
+  },
+  "rdsplus": {
+    "4B": {
+      "model": "Qwen/Qwen3-4B",
+      "load_time_s": 2.137869121041149,
+      "points": [
+        {
+          "n": 100,
+          "process_time_s": 3.1010482020210475,
+          "ms_per_sample": 31.010482020210475
+        },
+        {
+          "n": 1000,
+          "process_time_s": 27.291375227971002,
+          "ms_per_sample": 27.291375227971002
+        }
+      ]
+    }
+  }
+}

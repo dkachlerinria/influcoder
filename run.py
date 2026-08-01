@@ -111,7 +111,20 @@ PRESETS = {
     # -- a real train/eval signal-corruption bug, not a cost/quality choice.
     # 1024 (matching grad_max_len) cuts that to <5% / 0.6%. Ettin encoders
     # support up to ~8000 tokens so this is well within capacity.
-    "fig1_dolci": dict(n_eval_a=400, n_eval_p=400, n_train_a=1500, n_train_p=3000,
+    # n_eval_a/n_eval_p raised 400 -> 800 for the BIG_GPU_FINAL_EXP1 final run
+    # (explicit instruction: "full clean run at 800x800"). This is the ceiling
+    # `baselines.exp1.data.load_gt_and_splits(n_eval=...)` can slice DOWN from
+    # (it front-slices the cached full preset eval, never up) -- ground_truth's
+    # cache key includes n_eval_a/n_eval_p, so this produces a genuinely new
+    # gt_fig1_dolci_*.pt cache entry rather than colliding with the old 400x400
+    # one. BBH has 6511 anchors (need 800+1500=2300) and dolci-instruct's
+    # default pool cap is 6000 docs (need 800+3000=3800) -- both comfortably
+    # fit. Train side (n_train_a/n_train_p) unchanged, but disjoint_splits'
+    # front-slice design means train_anchors/train_pool SHIFT to a different
+    # (still disjoint) sample set than the 400x400 preset used -- any
+    # checkpoint trained under the old eval size must be retrained, not reused
+    # (see part1.py's ensure_checkpoint --retrain flag).
+    "fig1_dolci": dict(n_eval_a=800, n_eval_p=800, n_train_a=1500, n_train_p=3000,
                        epochs=8, proj_dim=65536, grad_max_len=1024,
                        check_projection=False, hard_ratio=0.0,
                        pool="dolci_instruct", encoder_max_len=1024),

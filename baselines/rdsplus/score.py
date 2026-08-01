@@ -14,7 +14,11 @@ from baselines.common import tokenized_dataset
 
 
 @torch.no_grad()
-def _weighted_mean_embeds(model, dataloader, device) -> torch.Tensor:
+def weighted_mean_embeds(model, dataloader, device) -> torch.Tensor:
+    """Public (not `_`-prefixed) so `baselines.exp1.part3` can time just this
+    per-sample representation step directly, the same way it reuses LoGRA's
+    `encode_sorted` -- without going through `score_rdsplus`'s full
+    anchor-vs-pool matmul, which is out of scope for a process-only timing."""
     all_embeds = []
     for batch in dataloader:
         input_ids = batch["input_ids"].to(device)
@@ -49,6 +53,6 @@ def score_rdsplus(splits, model_name: str, max_len: int = 1024,
                          batch_size=batch_size, shuffle=False)
     anchor_dl = DataLoader(tokenized_dataset(tok, splits["eval_anchors"], max_len),
                            batch_size=batch_size, shuffle=False)
-    pool = _weighted_mean_embeds(model, pool_dl, device)
-    anchors = _weighted_mean_embeds(model, anchor_dl, device)
+    pool = weighted_mean_embeds(model, pool_dl, device)
+    anchors = weighted_mean_embeds(model, anchor_dl, device)
     return torch.matmul(anchors, pool.T).float()

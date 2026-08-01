@@ -34,8 +34,8 @@ else:
     from . import config as cfg
 from . import data, methods, train
 
-ENC_DIR = Path("runs_out") / cfg.PRESET / cfg.PROFILE
-OUT = Path("baselines/out") / cfg.PRESET / cfg.PROFILE / "exp1_part1.json"
+ENC_DIR = Path("runs_out") / cfg.PRESET / cfg.PROFILE / cfg.seed_dir(cfg.SEED)
+OUT = Path("baselines/out") / cfg.PRESET / cfg.PROFILE / cfg.seed_dir(cfg.SEED) / "exp1_part1.json"
 
 
 def ensure_checkpoint(size: str, encoder_model: str, splits, full_gt_eval_texts, retrain: bool):
@@ -129,13 +129,19 @@ def main():
     run_row("tfidf", lambda meter: methods.run_tfidf(splits, meter=meter),
            gt, n_samples, all_metrics)
 
+    # less_fingerprint/logra_fingerprint are the single source of truth for
+    # "what config produced this row" -- Part 2 (and anything else that might
+    # reuse a LESS/LoGRA row instead of recomputing it) compares against
+    # exactly these same functions, so the writer and the reuse-checker can
+    # never drift out of sync with each other. They share several keys
+    # (n_eval/preset/gt_model/gt_lora_rank/attn/max_len/seed) with identical
+    # values, so merging is safe.
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps({
-        "config": {"preset": cfg.PRESET, "n_eval": args.n_eval, "attn": cfg.ATTN,
-                  "max_len": cfg.MAX_LEN, "less_rank": cfg.LESS_RANK,
-                  "logra_rank": cfg.LOGRA_RANK, "gt_model": cfg.GT_MODEL,
-                  "gt_lora_rank": cfg.GT_LORA_RANK, "n_train_a": cfg.N_TRAIN_A,
-                  "n_train_p": cfg.N_TRAIN_P, "influcoder_epochs": cfg.INFLUCODER_EPOCHS,
+        "config": {**methods.less_fingerprint(args.n_eval),
+                  **methods.logra_fingerprint(args.n_eval),
+                  "n_train_a": cfg.N_TRAIN_A, "n_train_p": cfg.N_TRAIN_P,
+                  "influcoder_epochs": cfg.INFLUCODER_EPOCHS,
                   "influcoder_lr": cfg.INFLUCODER_LR,
                   "influcoder_hard_ratio": cfg.INFLUCODER_HARD_RATIO},
         "methods": {k: {kk: vv for kk, vv in v.items() if kk != "per_anchor"}

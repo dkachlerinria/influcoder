@@ -25,6 +25,15 @@ GT_MODEL = "Qwen/Qwen3-4B"
 GT_LORA_RANK = 16
 SEED = 0
 
+# Which shuffle produces the eval/train PARTITION itself (which BBH/pool
+# samples land in eval vs. train) -- distinct from SEED above, which only
+# controls LoRA/model randomness on top of a FIXED partition. None means "use
+# the historical fixed split" (baselines.common.DATA_SEED, 42) -- every
+# existing cache file/checkpoint stays valid. A multi-seed sweep wanting
+# variance from data selection too (not just model/training stochasticity)
+# sets this per seed, e.g. in a seed-specific config module.
+DATA_SEED = None
+
 # --------------------------------------------------------------------------- #
 # Data / preset
 # --------------------------------------------------------------------------- #
@@ -40,6 +49,20 @@ PRESET = "fig1_dolci"  # BBH anchors x tasksource/dolci-instruct pool
 # historical-config artifact as already-done under biggpu. Real risk, not
 # hypothetical -- see EXP1_BIGGPU_FINAL.md's code-review pass.
 PROFILE = "default"
+
+
+def seed_dir(seed: int) -> str:
+    """Path segment distinguishing a non-default SEED run, for a multi-seed
+    sweep's checkpoints/outputs -- same rationale as PROFILE above, one level
+    down. Empty for the canonical seed 0, so nothing about the
+    already-established seed-0 paths changes (joining a Path with "" is a
+    documented no-op); "seedN" otherwise, so multiple seeds' artifacts can
+    never silently collide or reuse-skip each other the way un-namespaced
+    PROFILE paths used to. Takes `seed` explicitly (not read from a module
+    global) so it gives the right answer regardless of which config module's
+    SEED is actually active."""
+    return "" if seed == 0 else f"seed{seed}"
+
 
 # Canonical eval size. Both Part 1 and Part 2 default to this (the full
 # fig1_dolci eval) so their numbers are comparable; pass a smaller --n_eval on
@@ -168,7 +191,7 @@ INFLUCODER_RESTORE_BEST_EPOCH = True
 # real one. Kept here (not hardcoded in part3.py) so BIG_GPU_FINAL can widen
 # both without part3.py's code changing at all.
 # --------------------------------------------------------------------------- #
-PART3_LESS_MODELS = {"4B": GT_MODEL}
+PART3_LESS_MODELS = {"1.7B": "Qwen/Qwen3-1.7B"}
 PART3_LOGRA_MODELS = {"1.7B": "Qwen/Qwen3-1.7B"}
 PART3_N_TRAIN_A = 250
 PART3_N_TRAIN_P = 500

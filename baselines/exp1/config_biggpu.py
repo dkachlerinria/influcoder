@@ -44,6 +44,12 @@ each override -- summary here, detail there:
    in EXP1.md section 11 ("the amortization numbers should be re-measured at
    whatever the real experiment's actual InfluCoder training-set size ends up
    being") -- this run closes it.
+6. N_EVAL: 400 -> 800. Explicit instruction: "full clean run at 800x800".
+   `fig1_dolci`'s preset ceiling (run.py's PRESETS dict) was raised to match
+   -- `data.load_gt_and_splits(n_eval=...)` can only slice DOWN from the
+   cached full preset eval, never up, so N_EVAL here can never exceed that
+   ceiling. Overridden here (not in config.py) since 800x800 is this profile's
+   final-run size, not the smaller-GPU default's.
 
 Part 3's model scope (`PART3_LESS_MODELS`/`PART3_LOGRA_MODELS`) is NOT widened
 here, unlike an earlier draft of this file -- explicit instruction: start with
@@ -51,7 +57,7 @@ just LESS-4B and LoGRA-1.7B (config.py's existing scope), add more sizes
 later once these are confirmed working. So those two stay inherited from
 config.py unchanged, same as everything below.
 
-Everything else (GT model/rank, N_EVAL, N_TRAIN_A/N_TRAIN_P, ATTN, MAX_LEN,
+Everything else (GT model/rank, N_TRAIN_A/N_TRAIN_P, ATTN, MAX_LEN,
 LESS_PROJ_DIM/LORA_ALPHA/DROPOUT/BLOCK_SIZE/GRADIENT_CHECKPOINTING/
 PROJECT_INTERVAL, LOGRA_MLP_ONLY/TARGET_MODULES, ENCODER_MODELS,
 INFLUCODER_PROJ_DIM/EPOCHS/HARD_RATIO/LR/SEED/ENCODER_MAX_LEN, PART3_LESS_MODELS,
@@ -93,3 +99,8 @@ INFLUCODER_RESTORE_BEST_EPOCH = False   # was True (config.py) -- see point 4.
 # --------------------------------------------------------------------------- #
 PART3_N_TRAIN_A = N_TRAIN_A              # was 250 (config.py)
 PART3_N_TRAIN_P = N_TRAIN_P              # was 500 (config.py)
+
+# --------------------------------------------------------------------------- #
+# 6. Eval size -- the final-run 800x800 (see module docstring point 6)
+# --------------------------------------------------------------------------- #
+N_EVAL = 800   # was 400 (config.py)

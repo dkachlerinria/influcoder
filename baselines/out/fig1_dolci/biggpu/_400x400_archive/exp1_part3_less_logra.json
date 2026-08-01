@@ -1,0 +1,55 @@
+{
+  "config": {
+    "max_len": 1024,
+    "attn": "sdpa",
+    "sizes": [
+      100,
+      1000
+    ],
+    "less_rank": 32,
+    "logra_rank": 32,
+    "logra_big_gpu": true,
+    "less_models": {
+      "1.7B": "Qwen/Qwen3-1.7B"
+    },
+    "logra_models": {
+      "1.7B": "Qwen/Qwen3-1.7B"
+    }
+  },
+  "less": {
+    "1.7B": {
+      "model": "Qwen/Qwen3-1.7B",
+      "load_time_s": 2.3525830330327153,
+      "points": [
+        {
+          "n": 100,
+          "process_time_s": 13.319057206856087,
+          "ms_per_sample": 133.19057206856087
+        },
+        {
+          "n": 1000,
+          "process_time_s": 123.84517505415715,
+          "ms_per_sample": 123.84517505415715
+        }
+      ]
+    }
+  },
+  "logra": {
+    "1.7B": {
+      "model": "Qwen/Qwen3-1.7B",
+      "load_time_s": 2.1507268741261214,
+      "points": [
+        {
+          "n": 100,
+          "process_time_s": 4.4544198520015925,
+          "ms_per_sample": 44.544198520015925
+        },
+        {
+          "n": 1000,
+          "process_time_s": 33.78504670900293,
+          "ms_per_sample": 33.78504670900293
+        }
+      ]
+    }
+  }
+}

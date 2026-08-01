@@ -2,27 +2,33 @@
 """EXP1 Part 3: GPU-time-vs-Samples-Processed Amortization.
 
 At what point does InfluCoder's up-front setup cost (teacher-gradient
-collection + distillation training) pay for itself against LESS's/LoGRA's
-per-sample cost, in real cumulative GPU time?
+collection + distillation training) pay for itself against LESS's/LoGRA's/
+RDS+'s per-sample cost, in real cumulative GPU time?
 
 "Process" means computing the per-sample representation ONLY (LESS: projected
 gradient via `collect_grads`; LoGRA: per-sample [r,r] gradient factor via
-`LoGra.encode`; InfluCoder: encoder embedding via `embed`) -- never the
-anchor-vs-pool scoring matmul, which is out of scope (depends on query-set
-size). Because this part only times wall-clock rather than scoring quality,
-its code path necessarily looks different from Parts 1/2 (no `report()`/GT
-comparison) -- but every model it loads goes through
-`baselines.exp1.methods.load_less_model`/`load_logra_model` (same rank/attn/
-block_size Part 1 uses) and its InfluCoder training goes through
-`baselines.exp1.train.train_influcoder` (same epochs/hard_ratio/lr/seed Parts
-1 and 2 use), so the PARAMETERS are identical even though the orchestration
-isn't.
+`LoGra.encode`; RDS+: weighted-mean hidden-state embedding via
+`weighted_mean_embeds`; InfluCoder: encoder embedding via `embed`) -- never
+the anchor-vs-pool scoring matmul, which is out of scope (depends on
+query-set size). Because this part only times wall-clock rather than scoring
+quality, its code path necessarily looks different from Parts 1/2 (no
+`report()`/GT comparison) -- but every model it loads goes through
+`baselines.exp1.methods.load_less_model`/`load_logra_model`/
+`load_rdsplus_model` (same rank/attn/block_size Part 1 uses) and its
+InfluCoder training goes through `baselines.exp1.train.train_influcoder`
+(same epochs/hard_ratio/lr/seed Parts 1 and 2 use), so the PARAMETERS are
+identical even though the orchestration isn't.
 
-LESS/LoGRA are only measured at n=100/1000 (cost-prohibitive beyond that) and
-extrapolated from there; InfluCoder is measured at n=100/1000/10000. Samples
-come from `tasksource/dolci-instruct` -- the only one of this repo's three
-pools with enough real, non-duplicated text to eventually cover 100K/1M (BBH
-caps at 6511 total, Dolly at 15011).
+RDS+ has no size family the way LESS/LoGRA do (Part 1 only ever scores it at
+`cfg.GT_MODEL`) -- timed as a single "4B" point, not a swept dict.
+
+LESS/LoGRA/RDS+ are only measured at n=100/1000 (cost-prohibitive beyond that,
+RDS+ included despite being cheaper per-sample than the gradient methods,
+kept consistent with them rather than separately tuned) and extrapolated from
+there; InfluCoder is measured at n=100/1000/10000. Samples come from
+`tasksource/dolci-instruct` -- the only one of this repo's three pools with
+enough real, non-duplicated text to eventually cover 100K/1M (BBH caps at
+6511 total, Dolly at 15011).
 
 Run the two halves as separate GPU jobs in parallel (no shared GPU-memory
 contention) via --only:
@@ -43,6 +49,7 @@ import torch
 from baselines.common import tokenized_dataset
 from baselines.less.less_embeds import collect_grads
 from baselines.logra.score import BIG_GPU_START_BATCH_SIZE, encode_sorted
+from baselines.rdsplus.score import weighted_mean_embeds
 from influcoder.data import load_bbh, load_dolci_instruct
 from influcoder.encoder import embed
 from influcoder.gradients import GradientFeaturizer
@@ -55,7 +62,9 @@ else:
 from . import methods, train
 
 LESS_LOGRA_SIZES = [100, 1_000]
-INFLUCODER_PROCESS_SIZES = [100, 1_000, 10_000]
+INFLUCODER_PROCESS_SIZES = [100, 1_000, 10_000, 100_000]  # 100K measured directly
+                                                          # this run, not extrapolated
+                                                          # (per explicit instruction)
 # Model-size scope and InfluCoder training-set size for this part now come
 # from config.py (PART3_LESS_MODELS/PART3_LOGRA_MODELS/PART3_N_TRAIN_A/
 # PART3_N_TRAIN_P) instead of being hardcoded here -- see config.py's
@@ -64,8 +73,8 @@ INFLUCODER_PROCESS_SIZES = [100, 1_000, 10_000]
 # BIG_GPU_FINAL widens both to match Parts 1/2's full families and real
 # training-set size.
 
-OUT_LESS_LOGRA = Path("baselines/out") / cfg.PRESET / cfg.PROFILE / "exp1_part3_less_logra.json"
-OUT_INFLUCODER = Path("baselines/out") / cfg.PRESET / cfg.PROFILE / "exp1_part3_influcoder.json"
+OUT_LESS_LOGRA = Path("baselines/out") / cfg.PRESET / cfg.PROFILE / cfg.seed_dir(cfg.SEED) / "exp1_part3_less_logra.json"
+OUT_INFLUCODER = Path("baselines/out") / cfg.PRESET / cfg.PROFILE / cfg.seed_dir(cfg.SEED) / "exp1_part3_influcoder.json"
 
 
 def _logra_encode(logra, ds, is_test):
@@ -144,14 +153,39 @@ def time_less_logra():
         torch.cuda.empty_cache()
         logra_results[label] = {"model": model_name, "load_time_s": logra_load_s, "points": logra_points}
 
+    rdsplus_results = {}
+    label, model_name = "4B", cfg.GT_MODEL
+    print(f"\n########## RDS+ {model_name} ({cfg.ATTN}) ##########")
+    t_load0 = time.perf_counter()
+    tok, model = methods.load_rdsplus_model(model_name)
+    torch.cuda.synchronize()
+    rdsplus_load_s = time.perf_counter() - t_load0
+
+    rdsplus_points = []
+    for n in LESS_LOGRA_SIZES:
+        dl = torch.utils.data.DataLoader(
+            tokenized_dataset(tok, samples_by_n[n], cfg.MAX_LEN), batch_size=1, shuffle=False)
+        torch.cuda.synchronize()
+        t0 = time.perf_counter()
+        weighted_mean_embeds(model, dl, "cuda")
+        torch.cuda.synchronize()
+        elapsed = time.perf_counter() - t0
+        rdsplus_points.append({"n": n, "process_time_s": elapsed, "ms_per_sample": 1000 * elapsed / n})
+        print(f"  RDS+ {label}: n={n:6d}  {elapsed:8.2f}s  {1000 * elapsed / n:8.2f} ms/sample")
+    del model
+    torch.cuda.empty_cache()
+    rdsplus_results[label] = {"model": model_name, "load_time_s": rdsplus_load_s, "points": rdsplus_points}
+
     OUT_LESS_LOGRA.parent.mkdir(parents=True, exist_ok=True)
     OUT_LESS_LOGRA.write_text(json.dumps({
         "config": {"max_len": cfg.MAX_LEN, "attn": cfg.ATTN, "sizes": LESS_LOGRA_SIZES,
                   "less_rank": cfg.LESS_RANK, "logra_rank": cfg.LOGRA_RANK,
                   "logra_big_gpu": cfg.LOGRA_BIG_GPU,
-                  "less_models": cfg.PART3_LESS_MODELS, "logra_models": cfg.PART3_LOGRA_MODELS},
+                  "less_models": cfg.PART3_LESS_MODELS, "logra_models": cfg.PART3_LOGRA_MODELS,
+                  "rdsplus_model": cfg.GT_MODEL},
         "less": less_results,
         "logra": logra_results,
+        "rdsplus": rdsplus_results,
     }, indent=2))
     print(f"\nwrote {OUT_LESS_LOGRA}")
 

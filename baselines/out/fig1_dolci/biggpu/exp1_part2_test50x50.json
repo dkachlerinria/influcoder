@@ -1,0 +1,51 @@
+{
+  "config": {
+    "preset": "fig1_dolci",
+    "n_eval": 50,
+    "encoder_model": "jhu-clsp/ettin-encoder-68m",
+    "gt_model": "Qwen/Qwen3-4B",
+    "gt_lora_rank": 16,
+    "epochs": 8,
+    "hard_ratio": 0.0,
+    "lr": 5e-05,
+    "seed": 0,
+    "ratio": "1:2",
+    "anchor_point_n_train_a": 1500
+  },
+  "points": [
+    {
+      "n_train_anchors": 25,
+      "n_train_pool": 50,
+      "n_train_total": 75,
+      "untrained_agg": 0.20739495798319327,
+      "agg": 0.5628331332533013,
+      "per_anchor_mean": 0.5142223289315726,
+      "elapsed_s": 24.4
+    },
+    {
+      "n_train_anchors": 100,
+      "n_train_pool": 200,
+      "n_train_total": 300,
+      "untrained_agg": 0.20739495798319327,
+      "agg": 0.5210564225690276,
+      "per_anchor_mean": 0.4965282112845138,
+      "elapsed_s": 15.8
+    },
+    {
+      "n_train_anchors": 1500,
+      "n_train_pool": 3000,
+      "n_train_total": 4500,
+      "untrained_agg": 0.20739495798319327,
+      "agg": 0.7962064825930372,
+      "per_anchor_mean": 0.7573109243697478,
+      "elapsed_s": 177.6
+    }
+  ],
+  "reference_lines": {
+    "less_4B": 0.9716686674669868,
+    "less_1.7B": 0.6315966386554621,
+    "logra_4B": 0.9504441776710684,
+    "logra_1.7B": 0.5360384153661464
+  },
+  "reference_lines_n_eval": 50
+}

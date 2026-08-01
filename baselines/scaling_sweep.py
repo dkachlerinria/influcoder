@@ -38,8 +38,13 @@ from influcoder.gradients import GradientFeaturizer
 from influcoder.metrics import spearman_metrics
 
 
-def train_features(splits, cfg, grad_model, lora_rank, seed):
-    """Gradient features for the FULL train side, cached. Sliced per size."""
+def train_features(splits, cfg, grad_model, lora_rank, seed, data_seed=None):
+    """Gradient features for the FULL train side, cached. Sliced per size.
+
+    `data_seed` -- same meaning as `baselines.common.build_splits`'s: which
+    shuffle produced the eval/train partition these `splits` came from. Not
+    in the cache key unless it's a non-default value (see below) -- omitting
+    it for the common case keeps every existing cache file's name unchanged."""
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     n_a, n_p = len(splits["train_anchors"]), len(splits["train_pool"])
     # Model name goes in the key: without it, a Qwen3-4B run at the same
@@ -69,8 +74,17 @@ def train_features(splits, cfg, grad_model, lora_rank, seed):
     # matrix). ground_truth()'s GT cache key already included `pool` and was
     # never vulnerable to this; this key was the one place it was missing.
     pool_slug = cfg.get("pool", "dolly")
+    # data_seed goes in the key for the SAME reason n_eval_a/pool did above:
+    # a different data_seed means a different shuffle, so train_anchors/
+    # train_pool at this exact (n_a, n_p, eval size) are DIFFERENT actual
+    # samples -- without this, a second data_seed would silently "cache hit"
+    # the first's gradients against mismatched text, the identical failure
+    # mode already documented above for eval size and pool. Omitted from the
+    # filename for the historical default (42 or unset) so every existing
+    # cache file's name is unaffected.
+    data_tag = "" if data_seed is None or data_seed == 42 else f"_data{data_seed}"
     cache = CACHE_DIR / (f"trainfeat_{model_slug}_{pool_slug}_{n_a}x{n_p}_r{lora_rank}_s{seed}"
-                        f"_eval{cfg['n_eval_a']}x{cfg['n_eval_p']}.pt")
+                        f"_eval{cfg['n_eval_a']}x{cfg['n_eval_p']}{data_tag}.pt")
     if cache.exists():
         d = torch.load(cache)
         return d["a"], d["p"]

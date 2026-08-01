@@ -1,0 +1,37 @@
+{
+  "config": {
+    "grad_model": "Qwen/Qwen3-4B",
+    "gt_lora_rank": 16,
+    "encoder_model": "jhu-clsp/ettin-encoder-68m",
+    "epochs": 8,
+    "hard_ratio": 0.0,
+    "lr": 5e-05,
+    "n_train_anchors": 1500,
+    "n_train_pool": 3000
+  },
+  "collect_time_s": 593.1798774781637,
+  "train_time_s": 177.78324843314476,
+  "setup_time_s": 770.9631259113085,
+  "process_points": [
+    {
+      "n": 100,
+      "process_time_s": 0.5043865819461644,
+      "ms_per_sample": 5.043865819461644
+    },
+    {
+      "n": 1000,
+      "process_time_s": 2.8003290039487183,
+      "ms_per_sample": 2.8003290039487183
+    },
+    {
+      "n": 10000,
+      "process_time_s": 26.471040395088494,
+      "ms_per_sample": 2.647104039508849
+    },
+    {
+      "n": 100000,
+      "process_time_s": 268.30122780706733,
+      "ms_per_sample": 2.6830122780706733
+    }
+  ]
+}

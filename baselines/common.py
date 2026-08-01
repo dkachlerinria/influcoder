@@ -44,41 +44,53 @@ DATA_SEED = 42  # matches run.py's load_bbh/load_dolly seed
 # --------------------------------------------------------------------------- #
 # Eval split + ground truth (mirrors run.py exactly)
 # --------------------------------------------------------------------------- #
-def build_splits(preset: str, seed: int = 0):
-    """The identical disjoint split run.py builds for this preset."""
+def build_splits(preset: str, seed: int = 0, data_seed: int | None = None):
+    """The identical disjoint split run.py builds for this preset.
+
+    `data_seed` controls WHICH samples land in eval vs. train (the shuffle
+    `load_bbh`/`load_pool` do before disjoint_splits' front-slicing) --
+    defaults to the historical fixed `DATA_SEED` (42) when not given, so
+    every existing call site is byte-for-byte unaffected. Pass an explicit
+    `data_seed` to get a genuinely different eval/train partition (e.g. for a
+    multi-seed sweep that wants variance from data selection, not just model/
+    training stochasticity) -- `seed` alone (LoRA/model randomness) does NOT
+    change which samples are even in the split."""
     cfg = PRESETS[preset]
+    data_seed = DATA_SEED if data_seed is None else data_seed
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
     return cfg, disjoint_splits(
-        load_bbh("data/eval/bbh", seed=DATA_SEED),
-        load_pool(cfg.get("pool", "dolly"), seed=DATA_SEED),
+        load_bbh("data/eval/bbh", seed=data_seed),
+        load_pool(cfg.get("pool", "dolly"), seed=data_seed),
         cfg["n_eval_a"], cfg["n_train_a"], cfg["n_eval_p"], cfg["n_train_p"],
     )
 
 
-def _gt_key(preset: str, grad_model: str, lora_rank: int, seed: int) -> str:
+def _gt_key(preset: str, grad_model: str, lora_rank: int, seed: int, data_seed: int) -> str:
     cfg = PRESETS[preset]
     payload = json.dumps({
         "preset": preset, "grad_model": grad_model, "lora_rank": lora_rank,
         "seed": seed, "n_eval_a": cfg["n_eval_a"], "n_eval_p": cfg["n_eval_p"],
         "proj_dim": cfg["proj_dim"], "grad_max_len": cfg["grad_max_len"],
-        "data_seed": DATA_SEED, "pool": cfg.get("pool", "dolly"),
+        "data_seed": data_seed, "pool": cfg.get("pool", "dolly"),
     }, sort_keys=True)
     return hashlib.md5(payload.encode()).hexdigest()[:12]
 
 
 def ground_truth(preset: str, seed: int = 0, grad_model: str = DEFAULT_GRAD_MODEL,
-                 lora_rank: int = 8):
+                 lora_rank: int = 8, data_seed: int | None = None):
     """[n_eval_a, n_eval_p] gradient-influence cosine GT, cached.
 
     Byte-for-byte the same matrix run.py uses as `gt` for this preset: gradient
     features of the eval anchors and eval pool under the same LoRA featurizer,
-    cosine between them.
+    cosine between them. `data_seed` -- see `build_splits`'s docstring --
+    defaults to the historical fixed split (42) when not given.
     """
-    cfg, splits = build_splits(preset, seed)
+    cfg, splits = build_splits(preset, seed, data_seed)
+    data_seed = DATA_SEED if data_seed is None else data_seed
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    key = _gt_key(preset, grad_model, lora_rank, seed)
+    key = _gt_key(preset, grad_model, lora_rank, seed, data_seed)
     cache = CACHE_DIR / f"gt_{preset}_{key}.pt"
     if cache.exists():
         # stored as a plain tensor so torch.load's weights_only default is happy

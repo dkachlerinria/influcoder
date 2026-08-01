@@ -34,7 +34,8 @@ def load_gt_and_splits(n_eval: int | None = None):
     sweep, e.g. Part 2).
     """
     full_gt, full_splits, preset_cfg = ground_truth(
-        cfg.PRESET, seed=cfg.SEED, grad_model=cfg.GT_MODEL, lora_rank=cfg.GT_LORA_RANK)
+        cfg.PRESET, seed=cfg.SEED, grad_model=cfg.GT_MODEL, lora_rank=cfg.GT_LORA_RANK,
+        data_seed=cfg.DATA_SEED)
 
     assert preset_cfg["grad_max_len"] == cfg.MAX_LEN == preset_cfg.get("encoder_max_len", cfg.MAX_LEN), (
         f"fig1_dolci's grad_max_len/encoder_max_len no longer both equal "
@@ -59,9 +60,11 @@ def load_train_features(splits, preset_cfg):
     """Cached Qwen3-4B (r16) gradient features for the FULL train side.
 
     Thin wrapper around `baselines.scaling_sweep.train_features` pinned to
-    `config.GT_MODEL`/`config.GT_LORA_RANK`/`config.SEED` -- the same cache
-    file Part 1's checkpoint training and Part 2's sweep both hit
-    (`trainfeat_Qwen_Qwen3-4B_<n_a>x<n_p>_r16_s0_eval400x400.pt`), so training
-    features are computed exactly once regardless of which part asks first.
+    `config.GT_MODEL`/`config.GT_LORA_RANK`/`config.SEED`/`config.DATA_SEED`
+    -- the same cache file Part 1's checkpoint training and Part 2's sweep
+    both hit (`trainfeat_Qwen_Qwen3-4B_<n_a>x<n_p>_r16_s0_eval400x400.pt`), so
+    training features are computed exactly once regardless of which part
+    asks first.
     """
-    return train_features(splits, preset_cfg, cfg.GT_MODEL, cfg.GT_LORA_RANK, cfg.SEED)
+    return train_features(splits, preset_cfg, cfg.GT_MODEL, cfg.GT_LORA_RANK, cfg.SEED,
+                          data_seed=cfg.DATA_SEED)

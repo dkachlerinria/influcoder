@@ -28,8 +28,6 @@ import json
 import time
 from pathlib import Path
 
-from influcoder.metrics import spearman_metrics
-
 import os as _os
 if _os.environ.get("EXP1_CONFIG") == "biggpu":
     from . import config_biggpu as cfg  # BIG_GPU_FINAL_EXP1 -- see that module's docstring
@@ -37,8 +35,8 @@ else:
     from . import config as cfg
 from . import data, methods, train
 
-OUT = Path("baselines/out") / cfg.PRESET / cfg.PROFILE / "exp1_part2.json"
-PART1_OUT = Path("baselines/out") / cfg.PRESET / cfg.PROFILE / "exp1_part1.json"
+OUT = Path("baselines/out") / cfg.PRESET / cfg.PROFILE / cfg.seed_dir(cfg.SEED) / "exp1_part2.json"
+PART1_OUT = Path("baselines/out") / cfg.PRESET / cfg.PROFILE / cfg.seed_dir(cfg.SEED) / "exp1_part1.json"
 DEFAULT_SIZES = [25, 50, 100, 250, 500, 750, 1000, cfg.N_TRAIN_A]
 
 
@@ -132,6 +130,10 @@ def main():
     # the previous version's mismatched-eval-size reference lines (EXP1.md
     # 4.2.5). Skipped if already computed at this exact n_eval (these take
     # several minutes each; don't redo them on every incremental --sizes resume).
+    # Each one first checks whether Part 1 already scored that exact model at
+    # a config-matching n_eval (methods.score_less_cached/score_logra_cached)
+    # -- Part 1 scores every LESS/LoGRA size anyway, so recomputing here when
+    # it already has the answer is pure waste.
     payload = json.loads(OUT.read_text())
     if payload.get("reference_lines_n_eval") == args.n_eval and "reference_lines" in payload:
         print(f"\nLESS/LoGRA reference lines already computed at n_eval={args.n_eval}, skipping.")
@@ -139,15 +141,13 @@ def main():
         print("\n########## LESS/LoGRA reference lines (same eval as this sweep) ##########")
         refs = {}
         for label, model_name in [("less_4B", cfg.GT_MODEL), ("less_1.7B", "Qwen/Qwen3-1.7B")]:
-            scores = methods.run_less(splits, model_name)
-            agg = spearman_metrics(scores.numpy(), gt)["aggregated"]
+            agg, reused = methods.score_less_cached(splits, model_name, label, gt, args.n_eval)
             refs[label] = agg
-            print(f"  {label}: {agg:+.4f}")
+            print(f"  {label}: {agg:+.4f}" + ("  (reused from Part 1)" if reused else ""))
         for label, model_name in [("logra_4B", cfg.GT_MODEL), ("logra_1.7B", "Qwen/Qwen3-1.7B")]:
-            scores = methods.run_logra(splits, model_name)
-            agg = spearman_metrics(scores.numpy(), gt)["aggregated"]
+            agg, reused = methods.score_logra_cached(splits, model_name, label, gt, args.n_eval)
             refs[label] = agg
-            print(f"  {label}: {agg:+.4f}")
+            print(f"  {label}: {agg:+.4f}" + ("  (reused from Part 1)" if reused else ""))
 
         payload["reference_lines"] = refs
         payload["reference_lines_n_eval"] = args.n_eval
