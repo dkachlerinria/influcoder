@@ -477,6 +477,68 @@ Verified leak-free via `methods/audit_leakage.py`'s `TOXICITY_MIXED_MODULES` (no
 scripts, 11 leak-free variants total across the whole document): 0 exact-prompt overlaps, 0 exact
 (prompt,response) pair overlaps.
 
+### 6.9 Counterfact: does hard_ratio or more data move Recall@50?
+
+§6.1's moredata run left Recall@50 essentially flat (0.4442 → 0.4411) while MRR jumped a lot
+(→0.8226). Unlike Toxicity/Bias's external pool, Counterfact's is not just a same-team analog —
+§4.1 already confirmed `NeelNanda/counterfact-tracing` is the exact parent corpus DATE-LM's local
+split was curated from (5,539/5,539 exact prompt match). So distributional mismatch isn't a
+plausible explanation for Recall@50's flatness here the way it briefly was for toxicity; the two
+remaining levers to check are `hard_ratio` (untested on this task until now — both Counterfact
+scripts had only ever used the default 0.5) and raw sample count.
+
+**Phase A — hard_ratio sweep at §6.1's moredata scale (900 anchors/2,000 candidates/500 held-out
+eval), everything else held fixed.** Three new scripts
+(`influcoder_attribute_noleak_counterfact_extquery_moredata_hard000/025/075.py`), each diffing
+from the moredata baseline in exactly one constant (`HARD_RATIO`) plus save path/docstring —
+confirmed via `diff`. `hard_ratio=1.0` skipped as in §6.8 (known collapse point in EXP1).
+
+| `hard_ratio` | Recall@50 | MRR |
+|---|---|---|
+| 0.0 | 0.4414 | 0.7837 |
+| 0.25 | 0.4508 | 0.8055 |
+| **0.5 (§6.1 baseline)** | **0.4411** | **0.8226** |
+| 0.75 | 0.4515 | 0.7910 |
+
+Unlike §6.8's clean interior optimum for toxicity, this is **non-monotonic**: 0.25 and 0.75 both
+score slightly *above* 0.5 and 0.0 on Recall@50, with no consistent trend across the sweep. The
+full spread (0.4411–0.4515) is only ~0.011 wide — comparable to the ~0.014 band this exact metric
+has shown across every Counterfact configuration tried anywhere in this document (original leaky
+0.4549 down to moredata's 0.4411), none of which involved a hard_ratio change. Read as: at this
+scale, hard_ratio does not have a confident, reliable effect on Recall@50 for this task, unlike
+its large and reproducible effect on toxicity AUPRC. (Best individual point, 0.75's 0.4515, is
+nominally the highest Recall@50 recorded anywhere in this document — noted for completeness, but
+given the non-monotonic shape this reads as noise around a flat response, not a real win worth
+promoting to "recommended.") MRR continues to prefer 0.5 outright (0.8226, clearly ahead of the
+other three), so 0.5 remains the right default regardless of what Recall@50 alone suggests.
+
+**Phase B — since phase A didn't move Recall@50 with confidence, tried more data instead.**
+`influcoder_attribute_noleak_counterfact_extquery_bigger.py`: doubles §6.1's moredata counts again
+(1,800 anchors/4,000 candidates/1,000 held-out eval, 6,800 of the 15,648-row clean pool),
+`hard_ratio=0.5` held (no confident alternative from phase A).
+
+| Version | Recall@50 | MRR |
+|---|---|---|
+| Recommended, §5.1 (300/500/250) | 0.4442 | 0.7756 |
+| Moredata, §6.1 (900/2,000/500) | 0.4411 | 0.8226 |
+| **Bigger, this run (1,800/4,000/1,000)** | **0.4448** | **0.8003** |
+
+Another small, inconclusive move (+0.0037 vs. moredata) — nowhere near toxicity's response to
+scale. MRR actually dropped slightly vs. moredata (though still well above the original
+recommended run's 0.7756).
+
+**Conclusion: Recall@50 on Counterfact appears largely insensitive to both hard_ratio (0.0–0.75)
+and sample count (300→1,800 anchors) within the ranges tested here** — it stays in a tight
+0.441–0.452 band throughout, never producing the kind of large, confident, reproducible jump
+either lever produced for toxicity AUPRC. This is a legitimate negative finding, not a tuning
+failure: the original recommended run (§5.1, 0.4442) and moredata (§6.1, 0.4411, but with much
+better MRR) remain the two reasonable choices depending on which metric matters more; nothing
+tested here displaces either with confidence. All single-seed (seed=0), no variance estimate.
+
+Verified leak-free via `methods/audit_leakage.py`'s extended `COUNTERFACT_MODULES` (6 variants
+now, all clean; 15 leak-free variants total across the whole document): 0 exact-prompt overlaps,
+0 subject overlaps, 0 exact (prompt,response) pair overlaps for every new script.
+
 ## 7. Reproduction
 
 ```bash
@@ -550,8 +612,18 @@ cd EXP2-datelm
   --config configs/toxicity-bias.yaml \
   --score_path results/toxicity-bias-influcoder-noleak-mixed-hard075/InfluCoder.pt
 
+# §6.9 Counterfact hard_ratio sweep + phase-B data scale-up (needs a GPU, no HF gating)
+../.venv_py311/bin/python methods/influcoder_attribute_noleak_counterfact_extquery_moredata_hard000.py
+../.venv_py311/bin/python methods/influcoder_attribute_noleak_counterfact_extquery_moredata_hard025.py
+../.venv_py311/bin/python methods/influcoder_attribute_noleak_counterfact_extquery_moredata_hard075.py
+../.venv_py311/bin/python methods/influcoder_attribute_noleak_counterfact_extquery_bigger.py
+../.venv_py311/bin/python evaluation/evaluate_application.py \
+  --config configs/factual-attribution.yaml \
+  --score_path results/factual-attribution-influcoder-noleak-extquery-moredata-hard000/InfluCoder.pt
+# (repeat --score_path for the hard025/hard075/bigger result dirs)
+
 # Independent leak audit (CPU-only, no GPU/model loading needed -- a couple minutes,
-# dominated by re-downloading/streaming the external pools). Checks all eleven runs above.
+# dominated by re-downloading/streaming the external pools). Checks all fifteen runs above.
 ../.venv_h100/bin/python methods/audit_leakage.py
 ```
 

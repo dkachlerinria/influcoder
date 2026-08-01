@@ -42,6 +42,10 @@ from methods.influcoder.teacher_grads import sample_valid_indices  # noqa: E402
 COUNTERFACT_MODULES = [
     "methods.influcoder_attribute_noleak_counterfact_extquery",
     "methods.influcoder_attribute_noleak_counterfact_extquery_moredata",
+    "methods.influcoder_attribute_noleak_counterfact_extquery_moredata_hard000",
+    "methods.influcoder_attribute_noleak_counterfact_extquery_moredata_hard025",
+    "methods.influcoder_attribute_noleak_counterfact_extquery_moredata_hard075",
+    "methods.influcoder_attribute_noleak_counterfact_extquery_bigger",
 ]
 TOXICITY_MODULES = [
     "methods.influcoder_attribute_noleak_toxicity",
