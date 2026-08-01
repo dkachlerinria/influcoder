@@ -54,7 +54,6 @@ the user rather than editing it out from under them.
 
 | Agent / branch | File(s) | Task | Started |
 |---|---|---|---|
-| fork/wildguard-toxicity (primary checkout) | EXP2-datelm/methods/influcoder_attribute_noleak_toxicity_wildguard.py, EXP2-datelm/methods/audit_leakage.py, EXP2-datelm/results/toxicity-bias-influcoder-noleak-wildguard/, EXP2.md | EXP2 toxicity leak-free fix redone against WildGuardMix (closes §8 open item) | 2026-08-01 |
 
 ## 3. Don't touch `legacy-pipeline`
 
