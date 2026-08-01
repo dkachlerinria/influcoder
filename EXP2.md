@@ -174,7 +174,73 @@ Same shape as Counterfact: ahead of Grad Dot/DataInf/EKFAC, behind Rep-Sim/Grad 
 Remember the §4.2 caveat — this used a different-source external pool (ToxicChat, not
 XSTest-response), so it's a slightly less exact distributional match than the Counterfact fix.
 
-## 6. Reproduction
+## 6. Ablation: more external samples, hard_ratio/epochs held fixed
+
+Tests whether the leak-free recommended results (§5) are data-starved: scale up the external
+anchor/candidate/held-out-eval counts substantially on both tasks, while deliberately **holding
+`hard_ratio` and `epochs` fixed** at their original values —
+`influcoder_attribute_noleak_counterfact_extquery_moredata.py` and
+`influcoder_attribute_noleak_toxicity_moredata.py`, copies of the §4 scripts with only the
+sample-count constants changed.
+
+`hard_ratio`/`epochs` were held fixed on purpose, not by oversight: EXP1's `FINDINGS.md` (same
+`influcoder.encoder.distill` code path) found (a) more epochs is a dead lever — 8→16 bought
++0.0057 (noise-sized) at best — and (b) scaling up training data *without* proportionally
+raising `hard_ratio` in step can regress quality (a bigger pool dilutes the easy-negative signal
+faster than it adds hard-negative signal). This run deliberately does not compensate for (b), to
+test directly whether that effect transfers to these two DATE-LM tasks rather than assuming it
+does.
+
+| Task | Anchors | Candidates | Held-out eval | vs. recommended (§5) |
+|---|---|---|---|---|
+| Counterfact | 900 (was 300) | 2,000 (was 500) | 500 (was 250) | out of 15,648 clean pool |
+| Toxicity/Bias | 100 toxic (was 40) | 1,000 benign + 300 toxic (was 300+100) | 300 benign + 100 toxic (was 100+50) | toxic side used 500/746 available |
+
+### 6.1 Counterfact — Recall@50, MRR
+
+| Version | Recall@50 | MRR |
+|---|---|---|
+| Leak-free, external queries (recommended, §5.1) | 0.4442 | 0.7756 |
+| **Leak-free, more samples (hard_ratio/epochs fixed)** | **0.4411** | **0.8226** |
+| Δ | −0.0031 | **+0.0470** |
+
+Recall@50 is flat (a 0.003 wobble, within run-to-run noise). MRR moved up a genuinely large
+amount — from mid-pack to just below Grad Sim (0.836), ahead of every other DATE-LM baseline on
+this metric (BM25 0.771, Rep-Sim 0.790, Grad Dot 0.768, LESS 0.772, DataInf 0.765, EKFAC 0.766).
+
+### 6.2 Toxicity/Bias — AUPRC
+
+| Version | AUPRC |
+|---|---|
+| Leak-free (recommended, §5.2) | 0.4242 |
+| **Leak-free, more samples (hard_ratio/epochs fixed)** | **0.5845** |
+| Δ | **+0.1603** |
+
+A large jump — moves InfluCoder from behind Grad Dot/DataInf/EKFAC to just past Rep-Sim (0.580),
+though still behind Grad Sim (0.601) and LESS (0.734).
+
+### 6.3 Reading this against the EXP1 finding
+
+This **does not reproduce** EXP1's "more data without more hard_ratio regresses" pattern — both
+tasks improved (one metric essentially flat, three metrics up, one substantially). Plausible
+reasons this differs from EXP1's `big4x` regression rather than confirming it: EXP1's regression
+was measured on a *fixed*-size Dolly/dolci-instruct eval slice as pool size grew past ~1500×3000
+with `hard_ratio=0` (no hard mining at all); these runs start from `hard_ratio=0.5` (already
+substantial hard mining) and scale a smaller multiple (2.2–3.3x depending on the axis, not
+EXP1's 4x), and the recommended baseline here was arguably *under*-provisioned to begin with (300
+anchors / 500 candidates vs. EXP1's finding that gains keep coming, with diminishing returns,
+past 1000). Read as: at `hard_ratio=0.5`, these particular sample-count ranges hadn't hit the
+dilution regime EXP1 hit at `hard_ratio=0`, not as a contradiction of that result. Not
+independently re-verified beyond this single run (seed=0 throughout, same as §5 — no multi-seed
+variance estimate here).
+
+Given the win is this clear on both tasks, worth considering promoting the moredata configs to
+the new recommended row in §5 and re-running the §3 equal-resource caveat's accounting (moredata
+uses noticeably more external data than the original recommended configs). Left as an open item
+rather than done inline here, to avoid silently swapping out §5's numbers without a dedicated
+pass.
+
+## 7. Reproduction
 
 ```bash
 cd EXP2-datelm
@@ -190,9 +256,20 @@ cd EXP2-datelm
 ../.venv_py311/bin/python evaluation/evaluate_application.py \
   --config configs/toxicity-bias.yaml \
   --score_path results/toxicity-bias-influcoder-noleak/InfluCoder.pt
+
+# §6 moredata ablation (needs a GPU; ~2-3 min on an RTX 6000 Ada -- ~3-4x the sample volume)
+../.venv_py311/bin/python methods/influcoder_attribute_noleak_counterfact_extquery_moredata.py
+../.venv_py311/bin/python evaluation/evaluate_application.py \
+  --config configs/factual-attribution.yaml \
+  --score_path results/factual-attribution-influcoder-noleak-extquery-moredata/InfluCoder.pt
+
+../.venv_py311/bin/python methods/influcoder_attribute_noleak_toxicity_moredata.py
+../.venv_py311/bin/python evaluation/evaluate_application.py \
+  --config configs/toxicity-bias.yaml \
+  --score_path results/toxicity-bias-influcoder-noleak-moredata/InfluCoder.pt
 ```
 
-## 7. Open items
+## 8. Open items
 
 - Toxicity/Bias's external pool (ToxicChat) is a weaker distributional match than Counterfact's
   (different source dataset, not just disjoint rows of the same one). If `allenai/wildguardmix`
