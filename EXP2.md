@@ -84,9 +84,13 @@ against that signal, then the **full, untouched** local train (5,473) + local re
 and scored in one pass — no cross-validation/stitching needed, since the encoder never saw any
 local data during training.
 
-Verified via independent audit (`sample: audit_leakage.py`, reconstructs the exact rows a
-completed run used and cross-checks them against local data): 0 exact-prompt overlaps, 0
-subject overlaps, 0 exact (prompt,response) pair overlaps.
+Verified via independent audit (`methods/audit_leakage.py`, committed and runnable — an earlier
+version of this doc cited a script with this name that was never actually committed; this is the
+real one). It reconstructs, via the same code paths the training scripts use, exactly which
+external rows a run drew for its anchor/candidate/held-out-eval sets, then independently
+cross-checks those specific rows against freshly-loaded local data: 0 exact-prompt overlaps, 0
+subject overlaps, 0 exact (prompt,response) pair overlaps — confirmed for both this script and
+the `_extquery_moredata` variant in §6.
 
 Earlier iterations kept for reference (`influcoder_attribute_noleak_counterfact.py`: fixes
 only the train-side leak; `influcoder_attribute_noleak_counterfact_kfold.py`: fixes both leaks
@@ -121,6 +125,10 @@ Pool: 40 external toxic queries (anchors) + candidates (300 fresh UltraChat beni
 ToxicChat toxic) + held-out eval (100 benign + 50 toxic). Real teacher gradients computed
 (checkpoint `DataAttributionEval/Pythia-1b-XSTest-response-Het`), encoder distilled purely on
 this external mix, then the full local train (10,187) + local ref (10) embedded and scored.
+
+Also verified via `methods/audit_leakage.py` (see §4.1): 0 exact-prompt overlaps, 0 exact
+(prompt,response) pair overlaps against local train+ref, for both this script and the
+`_toxicity_moredata` variant in §6 (no `subject` field on this task, so that axis doesn't apply).
 
 ## 5. Results
 
@@ -267,6 +275,10 @@ cd EXP2-datelm
 ../.venv_py311/bin/python evaluation/evaluate_application.py \
   --config configs/toxicity-bias.yaml \
   --score_path results/toxicity-bias-influcoder-noleak-moredata/InfluCoder.pt
+
+# Independent leak audit (CPU-only, no GPU/model loading needed -- a couple minutes,
+# dominated by re-downloading/streaming the external pools). Checks all four runs above.
+../.venv_h100/bin/python methods/audit_leakage.py
 ```
 
 ## 8. Open items
