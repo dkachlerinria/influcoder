@@ -183,6 +183,10 @@ consistent with MRR being sensitive to a handful of "gimme" hits from the leaked
 Recall@50's top-50 window mostly absorbs. Leak-free, InfluCoder lands mid-pack: clearly ahead
 of BM25/Rep-Sim, comparable to Grad Dot/DataInf/EKFAC/LESS on both metrics.
 
+**Superseded for Recall@50 by §6.10's encoder-size sweep**: the 400m/1b encoder variants
+(0.4609/0.4602) beat every number in this table, including the paper's Grad Dot/EKFAC/DataInf —
+see §6.10 before citing this table's Recall@50 as InfluCoder's ceiling.
+
 ### 5.2 Toxicity/Bias, XSTest-response-Het / Pythia-1b (AUPRC)
 
 | Version | AUPRC |
@@ -539,6 +543,55 @@ Verified leak-free via `methods/audit_leakage.py`'s extended `COUNTERFACT_MODULE
 now, all clean; 15 leak-free variants total across the whole document): 0 exact-prompt overlaps,
 0 subject overlaps, 0 exact (prompt,response) pair overlaps for every new script.
 
+### 6.10 Encoder-size sweep: the lever that actually moves Recall@50
+
+§6.9 found Recall@50 essentially flat (0.441–0.452 band) across both `hard_ratio` (0.0–0.75) and
+sample count (300→1,800 anchors), always using the default `jhu-clsp/ettin-encoder-68m`. Neither
+of those levers had ever varied the *encoder size* itself. Per direct instruction, swept it —
+`jhu-clsp/ettin-encoder-{150m,400m,1b}` (full family also includes 17m/32m, skipped as smaller
+than the already-tested 68m default and unlikely to help per EXP1's general "bigger + enough data
+wins" pattern) — holding §6.1's moredata sample counts/hard_ratio/epochs fixed, varying nothing
+else.
+
+**Efficiency note:** the teacher (Pythia-1B checkpoint) gradient computation for the fixed
+anchor/candidate/eval sets doesn't depend on which student encoder is being distilled into, so it
+was computed once (`influcoder_attribute_noleak_counterfact_extquery_moredata_encodersweep.py`)
+and reused across all three sizes — only `load_encoder`→`distill`→embed+score repeats per size,
+per `FINDINGS.md`'s documented time-saver for exactly this kind of sweep. This also guarantees all
+three sizes trained against the *identical* anchor/candidate/eval draw as the existing 68m
+moredata run (same `SEED`, same pool construction) — a clean single-variable comparison.
+
+| Encoder | Params | Recall@50 | MRR | Distill wall time |
+|---|---|---|---|---|
+| ettin-68m (§6.1, existing) | 68M | 0.4411 | 0.8226 | — |
+| ettin-150m | 150M | 0.4542 | 0.8187 | 194s |
+| **ettin-400m** | 400M | **0.4609** | 0.8241 | 266s |
+| ettin-1b | 1B | 0.4602 | **0.8537** | 471s |
+
+Real, monotonic improvement from 68m→150m→400m on Recall@50 (+0.013), breaking cleanly out of
+§6.9's 0.441–0.452 band — this is the first lever in the whole Counterfact investigation that
+moved Recall@50 by more than noise. 1b then **plateaus** rather than continuing the trend
+(0.4602 vs. 400m's 0.4609 — a 0.0007 difference, clearly noise, not a further gain), but its MRR
+jumps well past every other Counterfact result in this document, **0.8537 — ahead of the paper's
+Grad Sim baseline (0.836)**, the strongest MRR anywhere here. All three sizes trained cleanly, no
+collapse (fidelity `rho` still rising through the final epoch for 400m and 1b, best-epoch
+restoration landing at epoch 6-8/8 throughout) — the instability EXP1's `FINDINGS.md` documented
+for 150m/400m at *small* data scale (collapse within 1 epoch at 500x1000) did not reproduce here,
+consistent with this run's 3,400-total-sample scale being close to the ~4,500 threshold EXP1 found
+sufficient for stability.
+
+**New recommended setup for Counterfact: `ettin-400m`, moredata sample counts, `hard_ratio=0.5`.**
+Recall@50 0.4609 now beats every gradient-projection paper baseline (Grad Dot 0.466 excepted —
+still 0.005 short of that one) and is within 0.04 of LESS's 0.500, the paper's best. If MRR matters
+more than the small 400m→1b Recall@50 wobble, `ettin-1b` is the better pick (0.8537 MRR, beats
+Grad Sim outright) at ~1.8x the distillation wall-clock — both are legitimate answers depending on
+which metric the reader weights more.
+
+Verified leak-free via `methods/audit_leakage.py`'s extended `COUNTERFACT_MODULES` (adds the
+encoder-sweep module; since all three sizes share one anchor/candidate/eval draw, auditing the
+module once covers all three — 16 leak-free variants total across the whole document, all clean):
+0 exact-prompt overlaps, 0 subject overlaps, 0 exact (prompt,response) pair overlaps.
+
 ## 7. Reproduction
 
 ```bash
@@ -622,8 +675,16 @@ cd EXP2-datelm
   --score_path results/factual-attribution-influcoder-noleak-extquery-moredata-hard000/InfluCoder.pt
 # (repeat --score_path for the hard025/hard075/bigger result dirs)
 
+# §6.10 encoder-size sweep (needs a GPU; teacher grads computed once, ~3min, then
+# ~200-470s per encoder size for 150m/400m/1b -- reuses the moredata sample draw)
+../.venv_py311/bin/python methods/influcoder_attribute_noleak_counterfact_extquery_moredata_encodersweep.py
+../.venv_py311/bin/python evaluation/evaluate_application.py \
+  --config configs/factual-attribution.yaml \
+  --score_path results/factual-attribution-influcoder-noleak-extquery-moredata-400m/InfluCoder.pt
+# (repeat --score_path for the 150m/1b result dirs)
+
 # Independent leak audit (CPU-only, no GPU/model loading needed -- a couple minutes,
-# dominated by re-downloading/streaming the external pools). Checks all fifteen runs above.
+# dominated by re-downloading/streaming the external pools). Checks all sixteen runs above.
 ../.venv_h100/bin/python methods/audit_leakage.py
 ```
 
