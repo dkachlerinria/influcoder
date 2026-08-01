@@ -59,6 +59,7 @@ TOXICITY_MIXED_MODULES = [
     "methods.influcoder_attribute_noleak_toxicity_mixed",
     "methods.influcoder_attribute_noleak_toxicity_mixed_beavertails",
     "methods.influcoder_attribute_noleak_toxicity_mixed_bigger",
+    "methods.influcoder_attribute_noleak_toxicity_mixed_nohard",
 ]
 
 

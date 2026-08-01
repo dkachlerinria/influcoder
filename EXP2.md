@@ -413,6 +413,41 @@ Verified leak-free via `methods/audit_leakage.py`'s `TOXICITY_MIXED_MODULES` (no
 scripts, 9 leak-free variants total across the whole document): 0 exact-prompt overlaps, 0 exact
 (prompt,response) pair overlaps.
 
+### 6.7 Isolating `hard_ratio` alone, at §6.4's original (unscaled) sample counts
+
+§6.6 confounded two variables at once (bigger sample counts AND `hard_ratio=0.0`), so it can't say
+whether the regression was about the scale-up, the missing hard mining, or both. This run isolates
+just `hard_ratio`: `influcoder_attribute_noleak_toxicity_mixed_nohard.py` is byte-identical to
+§6.4's winning `_mixed.py` (100 WildGuardMix anchors, 300 ToxicChat + 1,000 UltraChat candidates,
+100 WildGuardMix + 300 UltraChat held-out eval, `EPOCHS=8`, `SEED=0`) with exactly one constant
+changed: `HARD_RATIO` 0.5 → **0.0**. Confirmed by diff against the source script — every other
+line is identical except the docstring, the save path, and that one constant.
+
+| Version | AUPRC |
+|---|---|
+| Cross-source mix, original scale, `hard_ratio=0.5` (§6.4, current best) | **0.6160** |
+| Cross-source mix, original scale, `hard_ratio=0.0` | 0.4664 |
+| Δ | **−0.1496** |
+| *(for reference)* bigger scale, `hard_ratio=0.0` (§6.6) | 0.5191 |
+
+**This isolates the effect cleanly: hard mining alone accounts for a −0.15 swing**, larger than
+the scale-up's partial rescue in §6.6 (0.4664 → 0.5191, +0.0527, from adding more data at
+`hard_ratio=0.0` without fixing the missing hard mining). Put together, the two runs tell a
+consistent story: hard-negative mining is doing real, substantial work in this cross-source setup,
+more so than data volume — more candidates without hard mining helps somewhat (more random draws
+occasionally land on a moderately-hard negative by chance) but comes nowhere close to recovering
+what `hard_ratio=0.5` provides directly. This directly answers the question §6.6 raised (was
+`hard_ratio=0.5` quietly propping up these numbers the way "same-source anchor/pool" turned out
+*not* to be propping up the single-source results?): yes, clearly — unlike the anchor/pool-source
+confound (which turned out not to be inflating anything when tested), hard-negative mining is a
+real, load-bearing part of why the cross-source mix works as well as it does. §6.4's 0.6160 remains
+the best number in this document, and this result reinforces keeping `hard_ratio=0.5` rather than
+casting doubt on it.
+
+Verified leak-free via `methods/audit_leakage.py`'s `TOXICITY_MIXED_MODULES` (now 4 cross-source
+scripts, 10 leak-free variants total across the whole document): 0 exact-prompt overlaps, 0 exact
+(prompt,response) pair overlaps.
+
 ## 7. Reproduction
 
 ```bash
@@ -472,8 +507,15 @@ cd EXP2-datelm
   --config configs/toxicity-bias.yaml \
   --score_path results/toxicity-bias-influcoder-noleak-mixed-bigger/InfluCoder.pt
 
+# §6.7 original-scale mix, hard_ratio=0.0 (isolates the hard_ratio variable alone; needs a GPU +
+# wildguardmix HF access as above)
+../.venv_py311/bin/python methods/influcoder_attribute_noleak_toxicity_mixed_nohard.py
+../.venv_py311/bin/python evaluation/evaluate_application.py \
+  --config configs/toxicity-bias.yaml \
+  --score_path results/toxicity-bias-influcoder-noleak-mixed-nohard/InfluCoder.pt
+
 # Independent leak audit (CPU-only, no GPU/model loading needed -- a couple minutes,
-# dominated by re-downloading/streaming the external pools). Checks all nine runs above.
+# dominated by re-downloading/streaming the external pools). Checks all ten runs above.
 ../.venv_h100/bin/python methods/audit_leakage.py
 ```
 
