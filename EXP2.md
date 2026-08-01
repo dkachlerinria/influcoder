@@ -367,6 +367,52 @@ Verified leak-free via `methods/audit_leakage.py`'s generalized `TOXICITY_MIXED_
 (now covers both cross-source scripts via introspection on which candidate-pool builder each module
 defines): 0 exact-prompt overlaps, 0 exact (prompt,response) pair overlaps.
 
+### 6.6 Scaling up §6.4's winning mix — and a deliberate `hard_ratio=0.0` deviation
+
+Scaled §6.4's winning cross-source design (WildGuardMix anchor+eval, ToxicChat candidates) to
+substantially bigger sample counts: anchors 100→**300** (WildGuardMix, well under its 8,368-row
+pool), candidates 300→**500** toxic (ToxicChat — capped here on purpose, its usable pool is only
+746 total) + 1,000→**2,500** benign (UltraChat), held-out eval 100→**200** toxic + 300→**600**
+benign. `influcoder_attribute_noleak_toxicity_mixed_bigger.py`, same role assignment as §6.4's
+`_mixed.py`, `EPOCHS` still held at 8.
+
+**One deliberate deviation from every other run in this document: `HARD_RATIO=0.0` here, not
+0.5.** This was an explicit instruction, specifically to test whether hard-negative mining itself
+was doing something analogous to what the same-source anchor/pool design turned out *not* to be
+doing in §6.4 (i.e., is `hard_ratio=0.5` quietly propping up these numbers the same way "same
+corpus for both roles" turned out not to be a confound?). This is a real risk, not a free
+scale-up: EXP1's `FINDINGS.md` documented that scaling candidate volume *without* proportionally
+raising `hard_ratio` can regress quality via pool dilution — and that finding was specifically
+about `hard_ratio=0` at scale, which is exactly the regime this run sits in (3,000 total
+candidates at `hard_ratio=0.0`).
+
+Before the (expensive) teacher-gradient/GPU step, the script prints a spot-check of a handful of
+raw prompt/response rows from each of the three external sources — manually reviewed here and all
+legible, properly delimited, on-topic (real toxic content from WildGuardMix/ToxicChat, real
+UltraChat benign chat), no encoding/mojibake/truncation artifacts. Training curve was clean too:
+loss fell smoothly (0.72→0.58) and held-out fidelity (`agg rho`) rose monotonically every single
+epoch (+0.37→+0.59), peaking at the final epoch — no collapse, no overfitting-shaped reversal.
+
+| Version | AUPRC |
+|---|---|
+| Cross-source mix, moredata scale, `hard_ratio=0.5` (§6.4, current best) | **0.6160** |
+| Cross-source mix, **bigger** scale, `hard_ratio=0.0` | 0.5191 |
+| Δ | **−0.0969** |
+
+**The dilution risk materialized — this regresses, clearly.** More data did not help here; it hurt,
+and in exactly the way FINDINGS.md predicted for `hard_ratio=0` at this candidate volume: with no
+hard-negative mining, a bigger pool of overwhelmingly-easy negatives swamps whatever hard-negative
+signal the encoder needs to calibrate against. This is a real, reported negative result, not
+hedged — §6.4's 0.6160 (moredata scale, `hard_ratio=0.5`) remains the best toxicity number in this
+document, and this run is evidence *for* keeping `hard_ratio` at 0.5 rather than a case for
+scaling further without it. Whether a bigger pool at `hard_ratio=0.5` (rather than 0.0) would beat
+0.6160 is a different, untested question — not run here since the instruction for this pass was
+specifically `hard_ratio=0.0`.
+
+Verified leak-free via `methods/audit_leakage.py`'s `TOXICITY_MIXED_MODULES` (now 3 cross-source
+scripts, 9 leak-free variants total across the whole document): 0 exact-prompt overlaps, 0 exact
+(prompt,response) pair overlaps.
+
 ## 7. Reproduction
 
 ```bash
@@ -420,8 +466,14 @@ cd EXP2-datelm
   --config configs/toxicity-bias.yaml \
   --score_path results/toxicity-bias-influcoder-noleak-mixed-beavertails/InfluCoder.pt
 
+# §6.6 scaled-up mix, hard_ratio=0.0 (needs a GPU + wildguardmix HF access as above)
+../.venv_py311/bin/python methods/influcoder_attribute_noleak_toxicity_mixed_bigger.py
+../.venv_py311/bin/python evaluation/evaluate_application.py \
+  --config configs/toxicity-bias.yaml \
+  --score_path results/toxicity-bias-influcoder-noleak-mixed-bigger/InfluCoder.pt
+
 # Independent leak audit (CPU-only, no GPU/model loading needed -- a couple minutes,
-# dominated by re-downloading/streaming the external pools). Checks all eight runs above.
+# dominated by re-downloading/streaming the external pools). Checks all nine runs above.
 ../.venv_h100/bin/python methods/audit_leakage.py
 ```
 
@@ -439,7 +491,12 @@ cd EXP2-datelm
   indefinitely. Tested one more variant (§6.5): swapping the mix's candidate pool from ToxicChat to
   the much larger BeaverTails (166,347 vs. 746 usable rows) — this made things *worse* (0.5608),
   not better, so candidate-pool volume alone isn't the mechanism; §6.4's ToxicChat-candidate mix
-  (0.6160) stays the best result found so far.
+  (0.6160) stays the best result found so far. Tried scaling that winning mix further at §6.6, but
+  deliberately with `hard_ratio=0.0` (testing whether hard mining itself was propping up the
+  numbers) — this regressed sharply (0.5191, −0.097), confirming `hard_ratio=0.5` is load-bearing
+  and matches EXP1's documented dilution-at-hard_ratio=0 pattern. §6.4's 0.6160 remains the best
+  result and the standing candidate for §5's recommended row; a bigger pool *at* `hard_ratio=0.5`
+  is untested and would be the natural next step if this gets revisited.
 - Only Pythia-1B has been leak-free-fixed. DATE-LM also reports Llama-3.2-1B and Llama-3.1-8B
   for both tasks; neither has been redone with external data yet.
 
