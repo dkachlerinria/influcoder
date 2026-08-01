@@ -1,0 +1,17 @@
+method: LESS
+
+task: "Counterfact"
+subset: "Pythia-1b"
+
+base_model_path: "EleutherAI/pythia-1b"
+checkpoint: "DataAttributionEval/Pythia-1b-counterfactual"
+
+device: "cuda"
+
+##################################
+# hyperparameter used for LESS
+# proj_dim: projection dimension of gradients
+proj_dim: 8192
+##################################
+
+save_path: ./results/factual-attribution-less/

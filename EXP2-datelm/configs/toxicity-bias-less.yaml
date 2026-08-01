@@ -1,0 +1,17 @@
+method: LESS
+
+task: "Toxicity/Bias"
+subset: "XSTest-response-Het"
+
+base_model_path: "EleutherAI/pythia-1b"
+checkpoint: "DataAttributionEval/Pythia-1b-XSTest-response-Het"
+
+device: "cuda"
+
+##################################
+# hyperparameter used for LESS
+# proj_dim: projection dimension of gradients
+proj_dim: 8192
+##################################
+
+save_path: ./results/toxicity-bias-less/

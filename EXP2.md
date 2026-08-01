@@ -394,3 +394,37 @@ cd EXP2-datelm
   indefinitely.
 - Only Pythia-1B has been leak-free-fixed. DATE-LM also reports Llama-3.2-1B and Llama-3.1-8B
   for both tasks; neither has been redone with external data yet.
+
+## 9. Wall-clock cost vs. other DATE-LM methods (partial measurement)
+
+Real fresh-process wall-clock timing (`/usr/bin/time -p`, one A40, warm HF/OS cache shared across
+runs) via `methods/dattri.py` (its `__main__` had a real bug -- `args.config_path` instead of
+`args.config`, meaning this code path had apparently never been successfully invoked before;
+fixed). Deprioritized mid-measurement to free the GPU for the WildGuardMix work in §4.3/§6.4, so
+this is partial, not a full method x task grid:
+
+| Method | Task | Wall-clock | Notes |
+|---|---|---|---|
+| Grad Sim | Counterfact | 1001s (~16.7 min) | full 5,473-train + 66-ref backward-pass gradients |
+| LESS | Counterfact | 2585s (~43.1 min) | ~2.6x Grad Sim -- extra projection overhead, unbatched |
+| InfluCoder (leak-free) | Counterfact | 183s (~3.1 min) | distills on 1,050 external rows, embeds full train+ref in one forward pass |
+| Grad Sim | Toxicity/Bias | 1764s (~29.4 min) | full 10,187-train + 10-ref |
+| LESS | Toxicity/Bias | not completed | killed at 56% (~50 min in) when GPU was reclaimed for §4.3/§6.4 -- no number, not extrapolated |
+| InfluCoder (leak-free) | Toxicity/Bias | not measured | deprioritized before this run started |
+
+Sanity check: re-evaluating the completed Grad Sim/LESS score files against DATE-LM's own
+`evaluate_application.py` reproduced the paper's published numbers closely (Grad Sim Counterfact
+0.493/0.836 vs. paper's 0.493/0.836; LESS Counterfact 0.500/0.772 vs. paper's 0.500/0.772; Grad Sim
+Toxicity/Bias 0.625 vs. paper's 0.601) -- the `dattri.py` code path, once the CLI bug was fixed, is
+producing real, correct scores, not just plausible-looking noise.
+
+Read on what's here: even this partial grid already shows InfluCoder's whole value proposition
+concretely -- ~3 min vs. ~17-43 min for one-off exact-gradient methods on Counterfact, because
+InfluCoder pays a bounded distillation cost once (on external data, not scaling with local train
+size) and then only *embeds* the full local train/ref set, while Grad Sim/LESS pay one backward
+pass per local training example every time. That gap should widen further on Toxicity/Bias's
+larger 10,187-example train set, but the LESS number to confirm that wasn't finished. Not
+independently re-verified beyond one run each (no multi-seed variance estimate); GPU-dependent
+(numbers are for a single A40, not the RTX 6000 Ada used for the §4-§6 InfluCoder runs, so don't
+diff these against §4's "~1-2 min" docstring estimate directly). Completing the LESS/InfluCoder
+Toxicity/Bias cells is left as a follow-up if this comparison becomes load-bearing.

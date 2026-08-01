@@ -184,5 +184,5 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, help="Path to the configuration file")
     args = parser.parse_args()
-    config = OmegaConf.load(args.config_path)
+    config = OmegaConf.load(args.config)
     attribute(config)
