@@ -329,6 +329,44 @@ Verified leak-free the same way as every other script in this doc, via
 `methods/audit_leakage.py`'s extended `TOXICITY_MODULES`/`audit_toxicity_mixed`: 0 exact-prompt
 overlaps, 0 exact (prompt,response) pair overlaps for both new scripts.
 
+### 6.5 Does a much bigger candidate pool beat ToxicChat's, holding the WildGuardMix anchor fixed?
+
+§6.4 found bigger *anchor+eval* volume (WildGuardMix, single-source) didn't beat ToxicChat's, and
+the cross-source mix's win looked like it might be about candidate-pool diversity rather than
+source-match. If diversity/volume on the candidate side is really what's driving the mix's win, a
+much larger candidate pool should do even better. **`PKU-Alignment/BeaverTails`** (open access, no
+gating) is exactly that: `prompt`/`response`/`is_safe` rows, `330k_train` split, **166,347 usable
+unsafe rows after exclusion** (35 excluded for exact-prompt overlap with local data) — roughly
+223x ToxicChat's 746.
+
+`influcoder_attribute_noleak_toxicity_mixed_beavertails.py`: byte-identical anchor+held-out-eval
+logic to §6.4's mixed script (same `build_wildguard_toxic_pool` call, same `N_EXT_ANCHORS=100`/
+`N_EVAL_TOXIC=100`, same seed — draws the identical 200 WildGuardMix rows), only the candidate pool
+source changes: BeaverTails instead of ToxicChat, same `N_EXT_TOXIC_POS=300`, same `hard_ratio=0.5`/
+`epochs=8`.
+
+| Version | AUPRC |
+|---|---|
+| WildGuardMix, moredata (single-source) | 0.5515 |
+| ToxicChat, moredata (single-source) | 0.5845 |
+| **Cross-source mix, WildGuardMix anchor + ToxicChat candidate (§6.4)** | **0.6160** |
+| Cross-source mix, WildGuardMix anchor + **BeaverTails** candidate | 0.5608 |
+
+**This does not replicate — a ~223x bigger candidate pool performed *worse* than ToxicChat's much
+smaller one**, and worse than even the single-source ToxicChat-moredata run (0.5845). Holding the
+same WildGuardMix anchor fixed and only swapping the candidate source (ToxicChat → BeaverTails)
+cost −0.055 AUPRC, the opposite direction from what "bigger/more diverse pool helps" would predict.
+So candidate-pool *volume* isn't the mechanism behind §6.4's win either — it's something more
+specific to ToxicChat as a candidate source (real-world multilingual user↔chatbot toxicity, closer
+in register/format to what a fine-tuned chat model's own training distribution looks like, perhaps)
+that BeaverTails' more templated QA-style harmful-response pairs don't reproduce. Not investigated
+further here. §6.4's 0.6160 (WildGuardMix anchor + ToxicChat candidate) remains the best toxicity
+number in this document.
+
+Verified leak-free via `methods/audit_leakage.py`'s generalized `TOXICITY_MIXED_MODULES` list
+(now covers both cross-source scripts via introspection on which candidate-pool builder each module
+defines): 0 exact-prompt overlaps, 0 exact (prompt,response) pair overlaps.
+
 ## 7. Reproduction
 
 ```bash
@@ -375,8 +413,15 @@ cd EXP2-datelm
   --config configs/toxicity-bias.yaml \
   --score_path results/toxicity-bias-influcoder-noleak-mixed/InfluCoder.pt
 
+# §6.5 BeaverTails candidate-pool variant (needs a GPU + the same wildguardmix HF access as above;
+# BeaverTails itself is open, no gating)
+../.venv_py311/bin/python methods/influcoder_attribute_noleak_toxicity_mixed_beavertails.py
+../.venv_py311/bin/python evaluation/evaluate_application.py \
+  --config configs/toxicity-bias.yaml \
+  --score_path results/toxicity-bias-influcoder-noleak-mixed-beavertails/InfluCoder.pt
+
 # Independent leak audit (CPU-only, no GPU/model loading needed -- a couple minutes,
-# dominated by re-downloading/streaming the external pools). Checks all seven runs above.
+# dominated by re-downloading/streaming the external pools). Checks all eight runs above.
 ../.venv_h100/bin/python methods/audit_leakage.py
 ```
 
@@ -391,7 +436,10 @@ cd EXP2-datelm
   at the larger scale, but the cross-source mix (0.6160) is now the best toxicity number in this
   document, ahead of Grad Sim and behind only LESS. Worth folding into whatever §6.3 promotion
   decision gets made for §5's recommended row, rather than treating §6/§6.4 as separate from §5
-  indefinitely.
+  indefinitely. Tested one more variant (§6.5): swapping the mix's candidate pool from ToxicChat to
+  the much larger BeaverTails (166,347 vs. 746 usable rows) — this made things *worse* (0.5608),
+  not better, so candidate-pool volume alone isn't the mechanism; §6.4's ToxicChat-candidate mix
+  (0.6160) stays the best result found so far.
 - Only Pythia-1B has been leak-free-fixed. DATE-LM also reports Llama-3.2-1B and Llama-3.1-8B
   for both tasks; neither has been redone with external data yet.
 

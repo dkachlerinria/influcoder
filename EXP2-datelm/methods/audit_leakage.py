@@ -50,10 +50,15 @@ TOXICITY_MODULES = [
     "methods.influcoder_attribute_noleak_toxicity_wildguard_moredata",
 ]
 # Handled separately below (audit_toxicity_mixed): draws from TWO independent
-# toxic pools (build_wildguard_toxic_pool for anchors+eval, build_toxicchat_toxic_pool
-# for candidates) instead of the single build_external_toxic_pool every other
-# toxicity script uses, so it doesn't fit audit_toxicity()'s generic shape.
-TOXICITY_MIXED_MODULE = "methods.influcoder_attribute_noleak_toxicity_mixed"
+# toxic pools (build_wildguard_toxic_pool for anchors+eval, a module-specific
+# candidate-pool builder -- build_toxicchat_toxic_pool or
+# build_beavertails_toxic_pool -- for candidates) instead of the single
+# build_external_toxic_pool every other toxicity script uses, so these don't
+# fit audit_toxicity()'s generic shape.
+TOXICITY_MIXED_MODULES = [
+    "methods.influcoder_attribute_noleak_toxicity_mixed",
+    "methods.influcoder_attribute_noleak_toxicity_mixed_beavertails",
+]
 
 
 def audit_counterfact(module_path: str, tokenizer):
@@ -157,9 +162,13 @@ def audit_toxicity(module_path: str, tokenizer):
 
 def audit_toxicity_mixed(module_path: str, tokenizer):
     """Cross-source variant: toxic anchors+held-out-eval come from one
-    WildGuardMix pool, toxic candidates from an independent ToxicChat pool.
-    Mirrors the module's own role-assignment logic exactly (same seeds), then
-    independently checks the resulting used rows against local data."""
+    WildGuardMix pool, toxic candidates from an independent second pool
+    (ToxicChat or BeaverTails, depending on the module). Mirrors the module's
+    own role-assignment logic exactly (same seeds), then independently checks
+    the resulting used rows against local data. The candidate-pool builder
+    differs by module (`build_toxicchat_toxic_pool(prompts, n)` vs.
+    `build_beavertails_toxic_pool(prompts, pairs, n)`) -- called via
+    introspection so this one function covers both."""
     m = importlib.import_module(module_path)
 
     local_train, local_ref = get_dataset(m.TASK, m.SUBSET)
@@ -175,9 +184,14 @@ def audit_toxicity_mixed(module_path: str, tokenizer):
     ext_anchors = wildguard_pool[:m.N_EXT_ANCHORS]
     toxic_eval = wildguard_pool[m.N_EXT_ANCHORS:m.N_EXT_ANCHORS + m.N_EVAL_TOXIC]
 
-    toxicchat_pool = m.build_toxicchat_toxic_pool(local_all_prompts, m.N_EXT_TOXIC_POS)
-    random.Random(m.SEED + 1).shuffle(toxicchat_pool)
-    toxic_candidates = toxicchat_pool[:m.N_EXT_TOXIC_POS]
+    if hasattr(m, "build_toxicchat_toxic_pool"):
+        candidate_pool = m.build_toxicchat_toxic_pool(local_all_prompts, m.N_EXT_TOXIC_POS)
+    elif hasattr(m, "build_beavertails_toxic_pool"):
+        candidate_pool = m.build_beavertails_toxic_pool(local_all_prompts, local_pairs, m.N_EXT_TOXIC_POS)
+    else:
+        raise NotImplementedError(f"{module_path}: no known candidate-pool builder found")
+    random.Random(m.SEED + 1).shuffle(candidate_pool)
+    toxic_candidates = candidate_pool[:m.N_EXT_TOXIC_POS]
 
     benign_pool = m.build_external_benign_pool(local_benign_prompts, m.N_EXT_BENIGN + m.N_EVAL_BENIGN)
     random.Random(m.SEED + 2).shuffle(benign_pool)
@@ -220,7 +234,8 @@ def main():
         results[mod] = audit_counterfact(mod, tokenizer)
     for mod in TOXICITY_MODULES:
         results[mod] = audit_toxicity(mod, tokenizer)
-    results[TOXICITY_MIXED_MODULE] = audit_toxicity_mixed(TOXICITY_MIXED_MODULE, tokenizer)
+    for mod in TOXICITY_MIXED_MODULES:
+        results[mod] = audit_toxicity_mixed(mod, tokenizer)
 
     print("\n== summary ==")
     all_clean = True
