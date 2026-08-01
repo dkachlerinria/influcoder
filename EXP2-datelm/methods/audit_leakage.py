@@ -47,6 +47,9 @@ COUNTERFACT_MODULES = [
     "methods.influcoder_attribute_noleak_counterfact_extquery_moredata_hard075",
     "methods.influcoder_attribute_noleak_counterfact_extquery_bigger",
     "methods.influcoder_attribute_noleak_counterfact_extquery_moredata_encodersweep",
+    "methods.influcoder_attribute_noleak_counterfact_extquery_moredata_400m_hardsweep",
+    "methods.influcoder_attribute_noleak_counterfact_extquery_bigger_400m",
+    "methods.influcoder_attribute_noleak_counterfact_extquery_bigger_400m_hard025",
 ]
 TOXICITY_MODULES = [
     "methods.influcoder_attribute_noleak_toxicity",

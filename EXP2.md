@@ -183,9 +183,10 @@ consistent with MRR being sensitive to a handful of "gimme" hits from the leaked
 Recall@50's top-50 window mostly absorbs. Leak-free, InfluCoder lands mid-pack: clearly ahead
 of BM25/Rep-Sim, comparable to Grad Dot/DataInf/EKFAC/LESS on both metrics.
 
-**Superseded for Recall@50 by §6.10's encoder-size sweep**: the 400m/1b encoder variants
-(0.4609/0.4602) beat every number in this table, including the paper's Grad Dot/EKFAC/DataInf —
-see §6.10 before citing this table's Recall@50 as InfluCoder's ceiling.
+**Superseded for Recall@50 by §6.11**: `ettin-400m` at `hard_ratio=0.25` reaches Recall@50=0.4689 /
+MRR=0.8739 — beats every number in this table except LESS's Recall@50 (0.500, now within 0.011),
+and beats Grad Sim's MRR (0.836) outright. See §6.10/§6.11 before citing this table's numbers as
+InfluCoder's ceiling.
 
 ### 5.2 Toxicity/Bias, XSTest-response-Het / Pythia-1b (AUPRC)
 
@@ -580,17 +581,65 @@ for 150m/400m at *small* data scale (collapse within 1 epoch at 500x1000) did no
 consistent with this run's 3,400-total-sample scale being close to the ~4,500 threshold EXP1 found
 sufficient for stability.
 
-**New recommended setup for Counterfact: `ettin-400m`, moredata sample counts, `hard_ratio=0.5`.**
-Recall@50 0.4609 now beats every gradient-projection paper baseline (Grad Dot 0.466 excepted —
-still 0.005 short of that one) and is within 0.04 of LESS's 0.500, the paper's best. If MRR matters
-more than the small 400m→1b Recall@50 wobble, `ettin-1b` is the better pick (0.8537 MRR, beats
-Grad Sim outright) at ~1.8x the distillation wall-clock — both are legitimate answers depending on
-which metric the reader weights more.
+Recall@50 0.4609 beat every gradient-projection paper baseline except Grad Dot, and was within 0.04
+of LESS's 0.500 — but §6.11 below found a further, larger gain on top of this by tuning
+`hard_ratio` specifically at 400m (§6.9's hard_ratio sweep was only ever run on 68m).
 
 Verified leak-free via `methods/audit_leakage.py`'s extended `COUNTERFACT_MODULES` (adds the
 encoder-sweep module; since all three sizes share one anchor/candidate/eval draw, auditing the
-module once covers all three — 16 leak-free variants total across the whole document, all clean):
-0 exact-prompt overlaps, 0 subject overlaps, 0 exact (prompt,response) pair overlaps.
+module once covers all three): 0 exact-prompt overlaps, 0 subject overlaps, 0 exact
+(prompt,response) pair overlaps.
+
+## 6.11 hard_ratio and data-scale tuning at ettin-400m
+
+§6.9's hard_ratio sweep (0.0/0.25/0.5/0.75) was run only on the 68m encoder, where it found
+Recall@50 essentially flat. Since encoder size turned out to matter a lot (§6.10), hard_ratio's
+optimum could plausibly be encoder-size-dependent too — worth checking directly at 400m rather
+than assuming 68m's flatness transfers. Separately, §6.9's phase-B data-scale-up (also 68m-only)
+barely moved Recall@50; retested here at 400m to see if the encoder-size gain compounds with more
+data.
+
+All four runs below reuse the moredata (900/2,000/500) or bigger (1,800/4,000/1,000)
+anchor/candidate/eval draws already established in §6.1/§6.9 — same `SEED=0`, same pool
+construction — with the encoder fixed at `ettin-400m` and only `hard_ratio` (and, for the last two
+rows, sample count) varying:
+
+| Config | hard_ratio | Sample counts | Recall@50 | MRR |
+|---|---|---|---|---|
+| §6.10 baseline | 0.5 | moredata (900/2,000/500) | 0.4609 | 0.8241 |
+| **hard_ratio=0.25** | **0.25** | **moredata** | **0.4689** | **0.8739** |
+| hard_ratio=0.75 | 0.75 | moredata | 0.4503 | 0.8141 |
+| bigger data alone | 0.5 | bigger (1,800/4,000/1,000) | 0.4511 | 0.7976 |
+| bigger data + hard_ratio=0.25 | 0.25 | bigger | 0.4575 | 0.8082 |
+
+**`hard_ratio=0.25` at 400m is the single largest gain found anywhere in this Counterfact
+investigation** — +0.008 Recall@50 and +0.050 MRR over the already-good 400m/0.5 baseline, on both
+metrics at once. Unlike 68m (§6.9, where hard_ratio was ~flat), it matters substantially at 400m —
+the optimum is encoder-size-dependent, not a fixed property of the task. `hard_ratio=0.75`
+overshoots the same way it did at 68m (§6.7's toxicity sweep also found 0.75 worse than 0.5), so
+0.25–0.5 looks like the right neighborhood generally, with the exact optimum shifting by encoder.
+
+Data scale continues to be the wrong lever here: bigger data alone regressed vs. moredata at
+matched `hard_ratio` (0.4511 < 0.4609), and combining the winning `hard_ratio=0.25` with bigger
+data did *not* stack additively — it landed at 0.4575, worse than `hard_ratio=0.25` alone at
+moredata scale (0.4689). More data has now failed to help Recall@50 on both 68m (§6.9) and 400m
+(here) — this looks like a real, encoder-size-independent property of this metric/task, not a
+68m-specific artifact.
+
+**Current best Recall@50 for Counterfact: `ettin-400m`, moredata sample counts (900/2,000/500),
+`hard_ratio=0.25` → Recall@50=0.4689, MRR=0.8739.** This is now within 0.011 of LESS's paper
+baseline (0.500) and its MRR (0.8739) is the best anywhere in this document, ahead of both
+Grad Sim (0.836) and the previous best (`ettin-1b`'s 0.8537 from §6.10).
+
+One preemption occurred during this run: the `bigger data + hard_ratio=0.25` combination was
+interrupted mid-run by besteffort preemption on its first GPU reservation (confirmed via the
+`oarsh` "cannot find cpuset" signature, not silently assumed) and re-run to completion on a second
+GPU — the number reported above is from the completed re-run, not an estimate.
+
+Verified leak-free via `methods/audit_leakage.py`'s extended `COUNTERFACT_MODULES` (three new
+modules: the 400m hard_ratio sweep and both bigger-data-at-400m scripts): 0 exact-prompt overlaps,
+0 subject overlaps, 0 exact (prompt,response) pair overlaps for all three — 19 leak-free variants
+total across the whole document, all clean.
 
 ## 7. Reproduction
 
@@ -683,8 +732,19 @@ cd EXP2-datelm
   --score_path results/factual-attribution-influcoder-noleak-extquery-moredata-400m/InfluCoder.pt
 # (repeat --score_path for the 150m/1b result dirs)
 
+# §6.11 hard_ratio + data-scale tuning at ettin-400m (needs a GPU, no HF gating; besteffort
+# jobs on G5K can be preempted mid-run -- the combined bigger+hard025 run below needed one retry
+# in practice, see §6.11's note)
+../.venv_h100/bin/python methods/influcoder_attribute_noleak_counterfact_extquery_moredata_400m_hardsweep.py
+../.venv_h100/bin/python methods/influcoder_attribute_noleak_counterfact_extquery_bigger_400m.py
+../.venv_h100/bin/python methods/influcoder_attribute_noleak_counterfact_extquery_bigger_400m_hard025.py
+../.venv_h100/bin/python evaluation/evaluate_application.py \
+  --config configs/factual-attribution.yaml \
+  --score_path results/factual-attribution-influcoder-noleak-extquery-moredata-400m-hard025/InfluCoder.pt
+# (repeat --score_path for the moredata-400m-hard075/bigger-400m/bigger-400m-hard025 result dirs)
+
 # Independent leak audit (CPU-only, no GPU/model loading needed -- a couple minutes,
-# dominated by re-downloading/streaming the external pools). Checks all sixteen runs above.
+# dominated by re-downloading/streaming the external pools). Checks all nineteen runs above.
 ../.venv_h100/bin/python methods/audit_leakage.py
 ```
 
