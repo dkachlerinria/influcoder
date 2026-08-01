@@ -47,7 +47,13 @@ TOXICITY_MODULES = [
     "methods.influcoder_attribute_noleak_toxicity",
     "methods.influcoder_attribute_noleak_toxicity_moredata",
     "methods.influcoder_attribute_noleak_toxicity_wildguard",
+    "methods.influcoder_attribute_noleak_toxicity_wildguard_moredata",
 ]
+# Handled separately below (audit_toxicity_mixed): draws from TWO independent
+# toxic pools (build_wildguard_toxic_pool for anchors+eval, build_toxicchat_toxic_pool
+# for candidates) instead of the single build_external_toxic_pool every other
+# toxicity script uses, so it doesn't fit audit_toxicity()'s generic shape.
+TOXICITY_MIXED_MODULE = "methods.influcoder_attribute_noleak_toxicity_mixed"
 
 
 def audit_counterfact(module_path: str, tokenizer):
@@ -149,6 +155,63 @@ def audit_toxicity(module_path: str, tokenizer):
     return len(prompt_overlap), len(pair_overlap)
 
 
+def audit_toxicity_mixed(module_path: str, tokenizer):
+    """Cross-source variant: toxic anchors+held-out-eval come from one
+    WildGuardMix pool, toxic candidates from an independent ToxicChat pool.
+    Mirrors the module's own role-assignment logic exactly (same seeds), then
+    independently checks the resulting used rows against local data."""
+    m = importlib.import_module(module_path)
+
+    local_train, local_ref = get_dataset(m.TASK, m.SUBSET)
+    local_rows = list(local_train) + list(local_ref)
+    local_all_prompts = set(r["prompt"].strip() for r in local_rows)
+    local_pairs = set((r["prompt"].strip(), r["response"].strip()) for r in local_rows)
+    local_benign_prompts = set(r["prompt"].strip() for r in local_train if r["type"] == "Benign")
+
+    random.seed(m.SEED)
+    n_wildguard_needed = m.N_EXT_ANCHORS + m.N_EVAL_TOXIC
+    wildguard_pool = m.build_wildguard_toxic_pool(local_all_prompts, n_wildguard_needed)
+    random.Random(m.SEED).shuffle(wildguard_pool)
+    ext_anchors = wildguard_pool[:m.N_EXT_ANCHORS]
+    toxic_eval = wildguard_pool[m.N_EXT_ANCHORS:m.N_EXT_ANCHORS + m.N_EVAL_TOXIC]
+
+    toxicchat_pool = m.build_toxicchat_toxic_pool(local_all_prompts, m.N_EXT_TOXIC_POS)
+    random.Random(m.SEED + 1).shuffle(toxicchat_pool)
+    toxic_candidates = toxicchat_pool[:m.N_EXT_TOXIC_POS]
+
+    benign_pool = m.build_external_benign_pool(local_benign_prompts, m.N_EXT_BENIGN + m.N_EVAL_BENIGN)
+    random.Random(m.SEED + 2).shuffle(benign_pool)
+    benign_candidates = benign_pool[:m.N_EXT_BENIGN]
+    benign_eval = benign_pool[m.N_EXT_BENIGN:m.N_EXT_BENIGN + m.N_EVAL_BENIGN]
+
+    candidates = benign_candidates + toxic_candidates
+    eval_pool = benign_eval + toxic_eval
+
+    anchor_chat = prepare_chat_format(ext_anchors)
+    cand_chat = prepare_chat_format(candidates)
+    eval_chat = prepare_chat_format(eval_pool)
+
+    anchor_idx = sample_valid_indices(anchor_chat, tokenizer, m.MAX_LEN, list(range(len(anchor_chat))), len(anchor_chat))
+    cand_idx = sample_valid_indices(cand_chat, tokenizer, m.MAX_LEN, list(range(len(cand_chat))), len(cand_chat))
+    eval_idx = sample_valid_indices(eval_chat, tokenizer, m.MAX_LEN, list(range(len(eval_chat))), len(eval_chat))
+
+    used_rows = ([ext_anchors[i] for i in anchor_idx]
+                 + [candidates[i] for i in cand_idx]
+                 + [eval_pool[i] for i in eval_idx])
+
+    prompt_overlap = [r for r in used_rows if r["prompt"].strip() in local_all_prompts]
+    pair_overlap = [r for r in used_rows
+                    if (r["prompt"].strip(), r["response"].strip()) in local_pairs]
+
+    print(f"\n== {module_path} ==")
+    print(f"  external rows actually drawn (post valid-loss-span filter): {len(used_rows)} "
+          f"(anchors={len(anchor_idx)} candidates={len(cand_idx)} held-out-eval={len(eval_idx)})")
+    print(f"  exact-prompt overlaps with local train+ref: {len(prompt_overlap)}")
+    print(f"  exact (prompt,response) pair overlaps:      {len(pair_overlap)}")
+    print("  (no subject field for this task -- prompt+pair are the applicable checks)")
+    return len(prompt_overlap), len(pair_overlap)
+
+
 def main():
     tokenizer = AutoTokenizer.from_pretrained("EleutherAI/pythia-1b")
 
@@ -157,6 +220,7 @@ def main():
         results[mod] = audit_counterfact(mod, tokenizer)
     for mod in TOXICITY_MODULES:
         results[mod] = audit_toxicity(mod, tokenizer)
+    results[TOXICITY_MIXED_MODULE] = audit_toxicity_mixed(TOXICITY_MIXED_MODULE, tokenizer)
 
     print("\n== summary ==")
     all_clean = True

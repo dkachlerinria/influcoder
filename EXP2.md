@@ -279,6 +279,56 @@ uses noticeably more external data than the original recommended configs). Left 
 rather than done inline here, to avoid silently swapping out §5's numbers without a dedicated
 pass.
 
+### 6.4 Toxicity/Bias: does external source matter at moredata scale, and does cross-source mixing?
+
+Two more runs, same moredata sample counts as §6.2 (100 toxic anchors / 1,000 benign + 300 toxic
+candidates / 300 benign + 100 toxic held-out eval), `hard_ratio`/`epochs` held fixed as always:
+
+- `influcoder_attribute_noleak_toxicity_wildguard_moredata.py` — WildGuardMix for anchors,
+  candidates, *and* held-out eval (single-source, same design as every other toxicity script here,
+  just WildGuardMix instead of ToxicChat, at moredata volume instead of §4.3's small-scale volume).
+- `influcoder_attribute_noleak_toxicity_mixed.py` — **cross-source**: toxic anchors and held-out
+  eval from WildGuardMix, toxic *candidates* from ToxicChat — a different corpus than the anchors,
+  by construction. Benign side is UltraChat throughout, unchanged. This directly tests a concern
+  raised about every single-source script in this doc (`_toxicity.py`, `_toxicity_moredata.py`,
+  `_toxicity_wildguard.py`, `_toxicity_wildguard_moredata.py`, all of which draw anchors and
+  candidates from one shuffled pool of the same corpus): is the anchor↔candidate gradient-similarity
+  signal the encoder learns actually about toxicity content, or partly just "these two texts share
+  the same corpus's writing style/format"? If it were the latter, forcing the two roles onto
+  different corpora should hurt. (Held-out eval was sourced from WildGuardMix — same as the
+  anchors, not the candidates — since its role is closer to "another query-side probe for
+  best-epoch selection" than to the scored candidate pool; stated plainly as a judgment call, not
+  hidden in the script.)
+
+| Version | AUPRC |
+|---|---|
+| ToxicChat, recommended (§5.2) | 0.4242 |
+| ToxicChat, moredata (§6.2) | 0.5845 |
+| WildGuardMix, recommended-scale (§4.3) | 0.4222 |
+| WildGuardMix, moredata (single-source) | 0.5515 |
+| **Cross-source mixed, moredata (WildGuardMix anchor+eval / ToxicChat candidate)** | **0.6160** |
+
+Two findings:
+
+1. **Source identity still doesn't explain much at moredata scale either.** WildGuardMix-moredata
+   (0.5515) lands close to but slightly below ToxicChat-moredata (0.5845) — same story as §4.3's
+   small-scale comparison (0.4222 vs. 0.4242), just replayed at higher volume. Confirms volume, not
+   source-distribution match, is what's doing the work here.
+2. **The cross-source mix did not reproduce the "same-source is a confound" worry — if anything,
+   the opposite happened.** 0.6160 is the best AUPRC in this entire document, ahead of *both*
+   single-source moredata variants, past Rep-Sim (0.580), and past **Grad Sim (0.601)** — only LESS
+   (0.734) remains ahead of it among every DATE-LM baseline. Forcing anchors and candidates onto
+   different corpora did not degrade the signal; it improved it. Read cautiously (single run,
+   seed=0, no multi-seed variance estimate, same epistemic caveat as §6.3) — but as far as this one
+   run goes, the earlier single-source design does not look like it was inflating AUPRC via a
+   corpus-style shortcut. A plausible (not verified further here) alternative explanation: mixing
+   sources may simply add training-signal diversity the same way more samples did in §6.1/§6.2,
+   rather than removing a confound per se.
+
+Verified leak-free the same way as every other script in this doc, via
+`methods/audit_leakage.py`'s extended `TOXICITY_MODULES`/`audit_toxicity_mixed`: 0 exact-prompt
+overlaps, 0 exact (prompt,response) pair overlaps for both new scripts.
+
 ## 7. Reproduction
 
 ```bash
@@ -313,8 +363,20 @@ cd EXP2-datelm
   --config configs/toxicity-bias.yaml \
   --score_path results/toxicity-bias-influcoder-noleak-wildguard/InfluCoder.pt
 
+# §6.4 WildGuardMix moredata + cross-source mixed variants (needs a GPU + the same wildguardmix
+# HF access as above)
+../.venv_py311/bin/python methods/influcoder_attribute_noleak_toxicity_wildguard_moredata.py
+../.venv_py311/bin/python evaluation/evaluate_application.py \
+  --config configs/toxicity-bias.yaml \
+  --score_path results/toxicity-bias-influcoder-noleak-wildguard-moredata/InfluCoder.pt
+
+../.venv_py311/bin/python methods/influcoder_attribute_noleak_toxicity_mixed.py
+../.venv_py311/bin/python evaluation/evaluate_application.py \
+  --config configs/toxicity-bias.yaml \
+  --score_path results/toxicity-bias-influcoder-noleak-mixed/InfluCoder.pt
+
 # Independent leak audit (CPU-only, no GPU/model loading needed -- a couple minutes,
-# dominated by re-downloading/streaming the external pools). Checks all five runs above.
+# dominated by re-downloading/streaming the external pools). Checks all seven runs above.
 ../.venv_h100/bin/python methods/audit_leakage.py
 ```
 
@@ -324,6 +386,11 @@ cd EXP2-datelm
   it (§4.3): AUPRC 0.4222 vs. ToxicChat's 0.4242 — a wash, not an improvement, despite the closer
   distributional match. ToxicChat remains the recommended row in §5.2 (marginally higher, and
   already the more thoroughly-exercised script); WildGuardMix is documented as an equally-valid
-  alternative with no meaningful score difference.
+  alternative with no meaningful score difference. Retested at moredata scale and with cross-source
+  anchor/candidate mixing in §6.4 — same "source doesn't matter much, volume does" conclusion holds
+  at the larger scale, but the cross-source mix (0.6160) is now the best toxicity number in this
+  document, ahead of Grad Sim and behind only LESS. Worth folding into whatever §6.3 promotion
+  decision gets made for §5's recommended row, rather than treating §6/§6.4 as separate from §5
+  indefinitely.
 - Only Pythia-1B has been leak-free-fixed. DATE-LM also reports Llama-3.2-1B and Llama-3.1-8B
   for both tasks; neither has been redone with external data yet.
