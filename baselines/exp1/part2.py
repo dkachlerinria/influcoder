@@ -140,8 +140,13 @@ def main():
     else:
         print("\n########## LESS/LoGRA reference lines (same eval as this sweep) ##########")
         refs = {}
-        for label, model_name in [("less_4B", cfg.GT_MODEL), ("less_1.7B", "Qwen/Qwen3-1.7B")]:
-            agg, reused = methods.score_less_cached(splits, model_name, label, gt, args.n_eval)
+        # LESS-4B at rank=32 (the ceiling from Part 1's rank sweep) + LESS-1.7B
+        # at the practical canonical rank (cfg.LESS_RANK) -- explicit
+        # instruction: Part 2 shows "LESS 4B r32" + "LESS 1.7B r8".
+        for label, model_name, lora_rank in [("less_4B_r32", cfg.GT_MODEL, 32),
+                                             ("less_1.7B_r8", "Qwen/Qwen3-1.7B", cfg.LESS_RANK)]:
+            agg, reused = methods.score_less_cached(splits, model_name, label, gt, args.n_eval,
+                                                    lora_rank=lora_rank)
             refs[label] = agg
             print(f"  {label}: {agg:+.4f}" + ("  (reused from Part 1)" if reused else ""))
         for label, model_name in [("logra_4B", cfg.GT_MODEL), ("logra_1.7B", "Qwen/Qwen3-1.7B")]:

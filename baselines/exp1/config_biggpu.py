@@ -17,10 +17,23 @@ import *`) and then overrides ONLY the ones that genuinely change for the
 big-GPU final run. See EXP1_BIGGPU_FINAL.md for the full rationale behind
 each override -- summary here, detail there:
 
-1. LESS_RANK: 16 -> 32 (matches LOGRA_RANK below, rather than the paper's 128
-   default -- explicit instruction this session, keeps both gradient methods
-   at the same rank and avoids running an untested rank=128 on this GPU with
-   no prior data point anywhere in this repo).
+1. LESS_RANK: 16 -> 8 (the practical/canonical rank -- Part 3's timing and
+   Part 2's LESS-1.7B reference line use this). A direct rank/proj_dim
+   speed+quality sweep on LESS-4B at 800x800 motivated it: rank=8 vs rank=32
+   gives ~16% faster inference (155.68ms vs 184.77ms/sample) for a tiny
+   quality cost (agg rho +0.9682 vs +0.9766, delta -0.0084) -- whereas the
+   SAME ~16% speedup via lowering LESS_PROJ_DIM instead costs far more
+   quality (proj_dim=2048: agg rho +0.9144, delta -0.0622, ~7x worse for the
+   same speed gain). Rank is the far better lever for 4B.
+   LESS_RANKS below is the full story, though: rank=8 is NOT uniformly safe
+   across model sizes. LESS-0.6B collapses at r8 (agg rho +0.128) vs r32
+   (+0.253) -- nearly halved, the same rank-starvation failure mode already
+   documented for LoGRA's 0.6B proxy (point 2 below). Rather than pick one
+   rank and hide that tradeoff, LESS_RANKS = [8, 32] scores EVERY LESS model
+   size at BOTH ranks, so Part 1's plot shows the starvation directly instead
+   of a single silently-compromised number -- explicit instruction: "do two
+   sets of LESS one at r=32, one at r=8... to show off how the rank starves
+   at 0.6B."
 2. LOGRA_RANK: 8 -> 32 (still UNIFORM across all 3 model sizes -- this stays a
    deliberate choice, isolating model size as the only confound, per
    config.py's own original rationale). Raised because uniform r8 was shown
@@ -50,6 +63,14 @@ each override -- summary here, detail there:
    cached full preset eval, never up, so N_EVAL here can never exceed that
    ceiling. Overridden here (not in config.py) since 800x800 is this profile's
    final-run size, not the smaller-GPU default's.
+7. LESS_RANKS (new): [8, 32]. Part 1's LESS rows are now named `less_{size}_r
+   {rank}` for every (size, rank) pair -- 6 rows total (4B/1.7B/0.6B x r8/r32)
+   -- instead of one row per size at one shared rank. Part 2's LESS reference
+   lines are `less_4B_r32` (the rank=32 ceiling) and `less_1.7B_r8` (the
+   practical rank), replacing the previous uniform-rank pair. Part 3's LESS
+   timing stays exactly `PART3_LESS_MODELS = {"1.7B": ...}` (config.py,
+   unchanged) at the single canonical `LESS_RANK` (8) -- explicit
+   instruction: "in part3 its just LESS 1.7B r8."
 
 Part 3's model scope (`PART3_LESS_MODELS`/`PART3_LOGRA_MODELS`) is NOT widened
 here, unlike an earlier draft of this file -- explicit instruction: start with
@@ -78,9 +99,12 @@ from .config import N_TRAIN_A, N_TRAIN_P
 PROFILE = "biggpu"
 
 # --------------------------------------------------------------------------- #
-# 1. LESS -- rank raised to match LoGRA's (not the paper's 128 default)
+# 1. LESS -- practical canonical rank (Part 3 timing, Part 2's 1.7B reference)
+# is 8; Part 1 sweeps EVERY model size at both 8 and 32 (see module docstring
+# points 1/7) to show the rank-starvation effect at 0.6B directly.
 # --------------------------------------------------------------------------- #
-LESS_RANK = 32   # was 16 (config.py) -- see module docstring point 1.
+LESS_RANK = 8            # was 16 (config.py), briefly 32 earlier this session
+LESS_RANKS = [8, 32]     # was [LESS_RANK] (config.py) -- see module docstring point 7.
 
 # --------------------------------------------------------------------------- #
 # 2. LoGRA -- higher uniform rank (fixes 0.6B rank-starvation), batching on

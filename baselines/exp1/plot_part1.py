@@ -40,7 +40,11 @@ if os.environ.get("EXP1_CONFIG") == "biggpu":
 else:
     from . import config as cfg
 
-C_GRAD = "#2a78d6"
+C_GRAD = "#2a78d6"      # LoGRA (uniform r32) + LESS r32
+C_GRAD_R8 = "#8fb8e8"   # LESS r8 -- lighter shade of the same hue (still
+                        # reads as "LESS/gradient", lightness carries the
+                        # rank sub-category) so the r8-vs-r32 comparison is a
+                        # single-glance color contrast, not just label text.
 C_FWD = "#eb6834"
 C_FREE = "#1baf7a"
 INK = "#0b0b0b"
@@ -55,10 +59,19 @@ IN_RESULTS = Path("baselines/out") / cfg.PRESET / cfg.PROFILE / cfg.seed_dir(cfg
 OUT_PATH = Path("baselines/out") / cfg.PRESET / cfg.PROFILE / cfg.seed_dir(cfg.SEED) / "exp1_part1_figure"
 
 # (label, marker, size_pt, color, filled, family, size_rank)
+# LESS is now TWO full families -- "less_r8" (practical) and "less_r32"
+# (ceiling) -- each its own connecting line in size order, deliberately kept
+# SEPARATE (not merged into one "less" family) specifically so the
+# rank-starvation effect at 0.6B (agg rho +0.128 at r8 vs +0.253 at r32) shows
+# up as a visible gap between the two lines rather than a single zigzagging
+# line that hides which point came from which rank.
 SPEC = {
-    "less_4B": ("LESS (4B)", "o", 150, C_GRAD, True, "less", 3),
-    "less_1.7B": ("LESS (1.7B)", "o", 105, C_GRAD, True, "less", 2),
-    "less_0.6B": ("LESS (0.6B)", "o", 65, C_GRAD, True, "less", 1),
+    "less_4B_r8": ("LESS (4B) r8", "o", 150, C_GRAD_R8, True, "less_r8", 3),
+    "less_1.7B_r8": ("LESS (1.7B) r8", "o", 105, C_GRAD_R8, True, "less_r8", 2),
+    "less_0.6B_r8": ("LESS (0.6B) r8", "o", 65, C_GRAD_R8, True, "less_r8", 1),
+    "less_4B_r32": ("LESS (4B) r32", "o", 150, C_GRAD, True, "less_r32", 3),
+    "less_1.7B_r32": ("LESS (1.7B) r32", "o", 105, C_GRAD, True, "less_r32", 2),
+    "less_0.6B_r32": ("LESS (0.6B) r32", "o", 65, C_GRAD, True, "less_r32", 1),
     "logra_4B": ("LoGRA (4B)", "s", 150, C_GRAD, True, "logra", 3),
     "logra_1.7B": ("LoGRA (1.7B)", "s", 105, C_GRAD, True, "logra", 2),
     "logra_0.6B": ("LoGRA (0.6B)", "s", 65, C_GRAD, True, "logra", 1),
@@ -71,9 +84,12 @@ SPEC = {
 
 # Label nudges: (dx, dy, ha) in points, tuned to avoid collisions.
 OFFSETS = {
-    "less_4B": (10, 4, "left"),
-    "less_1.7B": (10, -14, "left"),
-    "less_0.6B": (10, 6, "left"),
+    "less_4B_r8": (10, -14, "left"),
+    "less_1.7B_r8": (10, -14, "left"),
+    "less_0.6B_r8": (10, -14, "left"),
+    "less_4B_r32": (10, 6, "left"),
+    "less_1.7B_r32": (10, 6, "left"),
+    "less_0.6B_r32": (10, 6, "left"),
     "logra_4B": (10, -14, "left"),
     "logra_1.7B": (10, 6, "left"),
     "logra_0.6B": (10, 6, "left"),
@@ -91,17 +107,19 @@ def draw(ax, data):
     combined panel instead of a second, driftable copy of it."""
     methods = data["methods"]
     n_eval = data["config"]["n_eval"]
-    less_rank = data["config"]["less_rank"]
+    less_ranks = data["config"]["less_ranks"]
     logra_rank = data["config"]["logra_rank"]
 
-    for family, color in [("less", C_GRAD), ("logra", C_GRAD)]:
+    for family, color, ls in [("less_r8", C_GRAD_R8, (0, (4, 2))),
+                              ("less_r32", C_GRAD, "solid"),
+                              ("logra", C_GRAD, "solid")]:
         pts = sorted(
             ((methods[k]["time_per_sample_ms"], methods[k]["aggregated"])
              for k, v in SPEC.items() if v[5] == family),
             key=lambda p: p[0],
         )
         ax.plot([p[0] for p in pts], [p[1] for p in pts], color=color,
-               linewidth=1.3, alpha=0.45, zorder=2)
+               linewidth=1.3, alpha=0.45, zorder=2, linestyle=ls)
 
     for key, (label, marker, size, color, filled, family, _) in SPEC.items():
         m = methods[key]
@@ -126,8 +144,9 @@ def draw(ax, data):
     ax.set_xlabel("inference cost (ms/sample, log scale)", fontsize=10.5, color=INK)
     ax.set_ylabel(f"aggregate Spearman ρ vs. {data['config']['gt_model']}/"
                  f"r{data['config']['gt_lora_rank']} ground truth", fontsize=10.5, color=INK)
+    less_ranks_str = "/".join(str(r) for r in less_ranks)
     ax.set_title(f"EXP1 Part 1 (BIG_GPU_FINAL) — {n_eval}x{n_eval} eval\n"
-                f"LESS r={less_rank}, LoGRA r={logra_rank} (uniform, batched)",
+                f"LESS r={less_ranks_str} (every size, both ranks), LoGRA r={logra_rank} (uniform, batched)",
                 fontsize=11, color=INK, pad=10)
     ax.grid(True, which="major", color=GRID, linewidth=0.8, zorder=0)
     ax.set_axisbelow(True)
@@ -141,8 +160,10 @@ def draw(ax, data):
     ax.set_xticks([1, 5, 20, 50, 100, 200, 300])
 
     legend_elems = [
+        Line2D([0], [0], marker="o", color="none", markerfacecolor=C_GRAD_R8,
+              markeredgecolor=C_GRAD_R8, markersize=9, label="LESS r8 (gradient fwd+bwd)"),
         Line2D([0], [0], marker="o", color="none", markerfacecolor=C_GRAD,
-              markeredgecolor=C_GRAD, markersize=9, label="LESS (gradient fwd+bwd)"),
+              markeredgecolor=C_GRAD, markersize=9, label="LESS r32 (gradient fwd+bwd)"),
         Line2D([0], [0], marker="s", color="none", markerfacecolor=C_GRAD,
               markeredgecolor=C_GRAD, markersize=9, label="LoGRA (gradient fwd+bwd)"),
         Line2D([0], [0], marker="D", color="none", markerfacecolor=C_FWD,
@@ -152,7 +173,7 @@ def draw(ax, data):
         Line2D([0], [0], color=C_FREE, linewidth=1.6, linestyle=(0, (5, 3)),
               label="TF-IDF (no model, cost not comparable)"),
     ]
-    ax.legend(handles=legend_elems, loc="lower right", fontsize=8, frameon=False)
+    ax.legend(handles=legend_elems, loc="lower left", fontsize=8, frameon=False)
 
 
 def main():

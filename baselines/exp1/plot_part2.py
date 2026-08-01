@@ -46,8 +46,8 @@ OUT_PATH = Path("baselines/out") / cfg.PRESET / cfg.PROFILE / cfg.seed_dir(cfg.S
 # label, linestyle, linewidth, label_dy (points -- nudged to avoid collisions
 # when two reference lines land close together in data units)
 REF_SPEC = {
-    "less_4B": ("LESS (4B)", "solid", 1.8, 6),
-    "less_1.7B": ("LESS (1.7B)", "solid", 1.1, 6),
+    "less_4B_r32": ("LESS (4B) r32", "solid", 1.8, 6),
+    "less_1.7B_r8": ("LESS (1.7B) r8", "solid", 1.1, 6),
     "logra_4B": ("LoGRA (4B)", (0, (5, 2)), 1.8, -13),
     "logra_1.7B": ("LoGRA (1.7B)", (0, (5, 2)), 1.1, -13),
 }
@@ -115,9 +115,9 @@ def draw(ax, data):
         Line2D([0], [0], marker="D", color="none", markerfacecolor=C_FWD,
               markeredgecolor=C_FWD, markersize=9, label="InfluCoder 68m (single fwd)"),
         Line2D([0], [0], color=C_GRAD, linewidth=1.8, linestyle="solid",
-              label="LESS/LoGRA 4B (gradient fwd+bwd, this eval slice)"),
+              label="LESS-4B r32 [benchmaxxer] / LoGRA-4B r32 (this eval slice)"),
         Line2D([0], [0], color=C_GRAD, linewidth=1.1, linestyle=(0, (5, 2)),
-              label="LESS/LoGRA 1.7B (gradient fwd+bwd, this eval slice)"),
+              label="LESS-1.7B r8 / LoGRA-1.7B r32 (this eval slice)"),
         Line2D([0], [0], marker="D", color="none", markerfacecolor="none",
               markeredgecolor=C_FWD, markersize=9,
               label="untrained InfluCoder (0 training samples)"),

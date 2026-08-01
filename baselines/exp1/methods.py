@@ -41,10 +41,13 @@ else:
 # Full anchor-vs-pool scoring (Part 1; Part 2 uses train.py + these are not
 # re-run since Part 2's own quality signal comes from its trained encoder).
 # --------------------------------------------------------------------------- #
-def run_less(splits, model_name: str, meter=None):
+def run_less(splits, model_name: str, meter=None, lora_rank: int | None = None):
+    """`lora_rank` defaults to `cfg.LESS_RANK` -- override it to score at a
+    different rank (e.g. Part 1's rank sweep over `cfg.LESS_RANKS`)."""
     return score_less(
         splits, model_name, proj_dim=cfg.LESS_PROJ_DIM, max_len=cfg.MAX_LEN,
-        lora_rank=cfg.LESS_RANK, lora_alpha=cfg.LESS_LORA_ALPHA,
+        lora_rank=cfg.LESS_RANK if lora_rank is None else lora_rank,
+        lora_alpha=cfg.LESS_LORA_ALPHA,
         lora_dropout=cfg.LESS_LORA_DROPOUT, lora_seed=cfg.SEED,
         project_interval=cfg.LESS_PROJECT_INTERVAL,
         block_size=cfg.LESS_BLOCK_SIZE,
@@ -138,39 +141,45 @@ def load_rdsplus_model(model_name: str):
 # `run_logra` always reads `variants["logra_raw"]` regardless of `compute_fim`
 # -- so neither one ever changes what gets returned, only speed/memory.
 #
-# `part1.py` writes these exact dicts into its output's "config" section (so
-# there's one source of truth for "what a LESS/LoGRA row's config actually
-# was" -- part1.py can never write a fingerprint that this function doesn't
-# then recognize), and any part.py wanting to reuse a Part 1 row instead of
-# recomputing it compares against them here.
+# Fingerprints take `rank` EXPLICITLY rather than reading cfg.LESS_RANK/
+# LOGRA_RANK internally: Part 1 now sweeps EVERY LESS model size across
+# `cfg.LESS_RANKS` (e.g. [8, 32], to show the rank-starvation effect at 0.6B
+# directly rather than picking one rank), so "the LESS rank for this run" is
+# no longer a single global value -- it varies per ROW. `part1.py` writes the
+# resulting dict onto EACH row's own "config_fingerprint" field (not a single
+# shared top-level "config" section), and `_part1_cached_aggregated` compares
+# against that row's own stored fingerprint -- so reuse is correct per-row
+# even when different rows in the same file used different ranks.
 # --------------------------------------------------------------------------- #
-def less_fingerprint(n_eval: int) -> dict:
+def less_fingerprint(n_eval: int, lora_rank: int) -> dict:
     return {
         "n_eval": n_eval, "preset": cfg.PRESET, "gt_model": cfg.GT_MODEL,
         "gt_lora_rank": cfg.GT_LORA_RANK, "attn": cfg.ATTN, "max_len": cfg.MAX_LEN,
-        "less_rank": cfg.LESS_RANK, "less_proj_dim": cfg.LESS_PROJ_DIM,
+        "less_rank": lora_rank, "less_proj_dim": cfg.LESS_PROJ_DIM,
         "less_lora_alpha": cfg.LESS_LORA_ALPHA, "less_lora_dropout": cfg.LESS_LORA_DROPOUT,
         "less_project_interval": cfg.LESS_PROJECT_INTERVAL,
         "less_block_size": cfg.LESS_BLOCK_SIZE, "seed": cfg.SEED,
     }
 
 
-def logra_fingerprint(n_eval: int) -> dict:
+def logra_fingerprint(n_eval: int, rank: int) -> dict:
     return {
         "n_eval": n_eval, "preset": cfg.PRESET, "gt_model": cfg.GT_MODEL,
         "gt_lora_rank": cfg.GT_LORA_RANK, "attn": cfg.ATTN, "max_len": cfg.MAX_LEN,
-        "logra_rank": cfg.LOGRA_RANK, "logra_mlp_only": cfg.LOGRA_MLP_ONLY,
+        "logra_rank": rank, "logra_mlp_only": cfg.LOGRA_MLP_ONLY,
         "logra_target_modules": cfg.LOGRA_TARGET_MODULES, "seed": cfg.SEED,
     }
 
 
-def _part1_cached_aggregated(family: str, label: str, n_eval: int):
+def _part1_cached_aggregated(label: str, fingerprint: dict):
     """Return Part 1's `aggregated` score for `label` (e.g. "less_1.7B") if
-    Part 1's output exists, was written under a config matching
-    `less_fingerprint`/`logra_fingerprint` for the CURRENT config/n_eval, and
-    actually scored `label`. Returns None on any mismatch -- missing file,
-    different config, or the label just isn't in there -- so the caller can
-    fall back to scoring it fresh exactly as before this existed."""
+    Part 1's output exists, scored `label`, and that row's own stored
+    "config_fingerprint" equals `fingerprint` exactly. Returns None on any
+    mismatch -- missing file, different config, or the label just isn't in
+    there -- so the caller can fall back to scoring it fresh exactly as
+    before this existed. (Older Part 1 files without a per-row
+    "config_fingerprint" simply never match -- None != any real dict --
+    so they correctly fall back to recompute rather than silently misfire.)"""
     part1_path = Path("baselines/out") / cfg.PRESET / cfg.PROFILE / cfg.seed_dir(cfg.SEED) / "exp1_part1.json"
     if not part1_path.exists():
         return None
@@ -178,33 +187,34 @@ def _part1_cached_aggregated(family: str, label: str, n_eval: int):
         p1 = json.loads(part1_path.read_text())
     except (json.JSONDecodeError, OSError):
         return None
-    fp = (less_fingerprint if family == "less" else logra_fingerprint)(n_eval)
-    p1_cfg = p1.get("config", {})
-    if any(p1_cfg.get(k) != v for k, v in fp.items()):
-        return None
     row = p1.get("methods", {}).get(label)
-    return None if row is None else row["aggregated"]
+    if row is None or row.get("config_fingerprint") != fingerprint:
+        return None
+    return row["aggregated"]
 
 
-def score_less_cached(splits, model_name: str, label: str, gt, n_eval: int, meter=None):
-    """`(aggregated_rho, reused)` for `label` (e.g. "less_4B") -- reuses Part
-    1's row when its config matches (see `_part1_cached_aggregated`),
-    otherwise runs `run_less` + scores it fresh, same as callers previously
-    did unconditionally."""
-    cached = _part1_cached_aggregated("less", label, n_eval)
+def score_less_cached(splits, model_name: str, label: str, gt, n_eval: int, meter=None,
+                      lora_rank: int | None = None):
+    """`(aggregated_rho, reused)` for `label` (e.g. "less_4B_r32") -- reuses
+    Part 1's row when its stored fingerprint matches (see
+    `_part1_cached_aggregated`), otherwise runs `run_less` + scores it fresh,
+    same as callers previously did unconditionally. `lora_rank` defaults to
+    `cfg.LESS_RANK` (see `run_less`)."""
+    lora_rank = cfg.LESS_RANK if lora_rank is None else lora_rank
+    cached = _part1_cached_aggregated(label, less_fingerprint(n_eval, lora_rank))
     if cached is not None:
         return cached, True
     from influcoder.metrics import spearman_metrics
-    scores = run_less(splits, model_name, meter=meter)
+    scores = run_less(splits, model_name, meter=meter, lora_rank=lora_rank)
     return spearman_metrics(scores.numpy(), gt)["aggregated"], False
 
 
 def score_logra_cached(splits, model_name: str, label: str, gt, n_eval: int, meter=None):
     """`(aggregated_rho, reused)` for `label` (e.g. "logra_1.7B") -- reuses
-    Part 1's row when its config matches (see `_part1_cached_aggregated`),
-    otherwise runs `run_logra` + scores it fresh, same as callers previously
-    did unconditionally."""
-    cached = _part1_cached_aggregated("logra", label, n_eval)
+    Part 1's row when its stored fingerprint matches (see
+    `_part1_cached_aggregated`), otherwise runs `run_logra` + scores it
+    fresh, same as callers previously did unconditionally."""
+    cached = _part1_cached_aggregated(label, logra_fingerprint(n_eval, cfg.LOGRA_RANK))
     if cached is not None:
         return cached, True
     from influcoder.metrics import spearman_metrics

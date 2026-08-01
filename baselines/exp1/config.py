@@ -17,13 +17,19 @@ max_len from here.
 """
 from __future__ import annotations
 
+import os as _os
+
 # --------------------------------------------------------------------------- #
 # Ground truth / teacher model -- used for BOTH the eval GT (Parts 1, 2) and
 # InfluCoder's distillation targets (Parts 1, 2, 3).
 # --------------------------------------------------------------------------- #
 GT_MODEL = "Qwen/Qwen3-4B"
 GT_LORA_RANK = 16
-SEED = 0
+# EXP1_SEED env var overrides for a multi-seed sweep (e.g. `EXP1_SEED=1
+# EXP1_INFLUCODER_SEED=1 EXP1_DATA_SEED=1 EXP1_CONFIG=biggpu python -m
+# baselines.exp1.part1`) -- defaults preserve the historical single-seed
+# behavior exactly when unset.
+SEED = int(_os.environ.get("EXP1_SEED", "0"))
 
 # Which shuffle produces the eval/train PARTITION itself (which BBH/pool
 # samples land in eval vs. train) -- distinct from SEED above, which only
@@ -31,8 +37,9 @@ SEED = 0
 # the historical fixed split" (baselines.common.DATA_SEED, 42) -- every
 # existing cache file/checkpoint stays valid. A multi-seed sweep wanting
 # variance from data selection too (not just model/training stochasticity)
-# sets this per seed, e.g. in a seed-specific config module.
-DATA_SEED = None
+# sets EXP1_DATA_SEED.
+_data_seed_env = _os.environ.get("EXP1_DATA_SEED")
+DATA_SEED = None if _data_seed_env is None else int(_data_seed_env)
 
 # --------------------------------------------------------------------------- #
 # Data / preset
@@ -52,16 +59,14 @@ PROFILE = "default"
 
 
 def seed_dir(seed: int) -> str:
-    """Path segment distinguishing a non-default SEED run, for a multi-seed
-    sweep's checkpoints/outputs -- same rationale as PROFILE above, one level
-    down. Empty for the canonical seed 0, so nothing about the
-    already-established seed-0 paths changes (joining a Path with "" is a
-    documented no-op); "seedN" otherwise, so multiple seeds' artifacts can
-    never silently collide or reuse-skip each other the way un-namespaced
-    PROFILE paths used to. Takes `seed` explicitly (not read from a module
-    global) so it gives the right answer regardless of which config module's
-    SEED is actually active."""
-    return "" if seed == 0 else f"seed{seed}"
+    """Path segment for a multi-seed sweep's checkpoints/outputs -- same
+    rationale as PROFILE above, one level down: every seed (including 0) gets
+    its own "seedN" subdirectory, so multiple seeds' artifacts are always
+    cleanly grouped and can never silently collide or reuse-skip each other
+    the way un-namespaced PROFILE paths used to. Takes `seed` explicitly (not
+    read from a module global) so it gives the right answer regardless of
+    which config module's SEED is actually active."""
+    return f"seed{seed}"
 
 
 # Canonical eval size. Both Part 1 and Part 2 default to this (the full
@@ -93,9 +98,17 @@ MAX_LEN = 1024     # grad_max_len == encoder_max_len in fig1_dolci; every
 # --------------------------------------------------------------------------- #
 # LESS
 # --------------------------------------------------------------------------- #
-LESS_RANK = 16              # uniform across LESS's 3 model sizes (NOT the
-                           # paper default of 128 -- see EXP1.md section 10.1
-                           # OOM saga for why)
+LESS_RANK = 16              # canonical/practical single rank -- what Part 3's
+                           # timing and any single-rank caller of run_less use
+                           # by default (NOT the paper default of 128 -- see
+                           # EXP1.md section 10.1 OOM saga for why)
+LESS_RANKS = [LESS_RANK]   # ranks Part 1 scores EVERY LESS model size at, one
+                           # row per (size, rank) pair -- a single-element list
+                           # here (this profile only ever used one rank), but
+                           # BIG_GPU_FINAL sweeps [8, 32] to show the
+                           # rank-starvation effect directly instead of hiding
+                           # it behind one chosen rank -- see
+                           # config_biggpu.py's docstring.
 LESS_PROJ_DIM = 8192
 LESS_LORA_ALPHA = 512
 LESS_LORA_DROPOUT = 0.0     # was 0.1 with the model left in train() mode --
@@ -159,7 +172,7 @@ INFLUCODER_LR = 5e-5          # distill()'s own default -- Part 2's scratch
                               # version silently overrode this to 1e-5 with no
                               # recorded rationale; canonicalized back to the
                               # recipe default here (see EXP1.md section 4.2.3)
-INFLUCODER_SEED = 0
+INFLUCODER_SEED = int(_os.environ.get("EXP1_INFLUCODER_SEED", "0"))  # see SEED above
 INFLUCODER_ENCODER_MAX_LEN = MAX_LEN
 
 # Epoch-selection convention: report the FINAL epoch's metrics, not whichever

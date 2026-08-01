@@ -66,7 +66,7 @@ def ensure_checkpoint(size: str, encoder_model: str, splits, full_gt_eval_texts,
     return save_dir
 
 
-def run_row(name, fn, gt, n_samples, all_metrics):
+def run_row(name, fn, gt, n_samples, all_metrics, fingerprint=None):
     print(f"\n########## {name} ##########")
     meter = CostMeter()
     t0 = time.perf_counter()
@@ -76,6 +76,13 @@ def run_row(name, fn, gt, n_samples, all_metrics):
     cost = summarize(0, meter, total_time, n_samples)
     m = report(name, scores, gt)
     m.update(cost)
+    if fingerprint is not None:
+        # Stored ON the row (not just a shared top-level "config" section):
+        # LESS now scores the same model (4B) at two different ranks in one
+        # run (the practical family + the "benchmaxxer" ceiling), so "the
+        # config that produced this row" is no longer a single run-wide
+        # value -- see methods.py's fingerprint docstring.
+        m["config_fingerprint"] = fingerprint
     all_metrics[name] = m
     print(f"  {name}: {cost['time_per_sample_ms']:.2f} ms/sample "
           f"(inference {cost['inference_time_s']:.1f}s, load {cost['load_time_s']:.1f}s)")
@@ -94,7 +101,7 @@ def main():
     n_samples = gt.shape[0] + gt.shape[1]
     print(f"EXP1 Part 1 | {args.n_eval}x{args.n_eval} eval slice of the cached "
           f"{preset_cfg['n_eval_a']}x{preset_cfg['n_eval_p']} fig1_dolci eval | "
-          f"attn={cfg.ATTN} max_len={cfg.MAX_LEN} | LESS rank={cfg.LESS_RANK} | "
+          f"attn={cfg.ATTN} max_len={cfg.MAX_LEN} | LESS ranks={cfg.LESS_RANKS} | "
           f"LoGRA rank={cfg.LOGRA_RANK}\n")
 
     eval_a_texts = [s.text for s in splits["eval_anchors"]]
@@ -111,15 +118,23 @@ def main():
         run_row(f"untrained_{size}", lambda meter, m=model_name:
                methods.run_untrained(splits, m, meter=meter), gt, n_samples, all_metrics)
 
-    # -- LESS (4B, 1.7B, 0.6B), same rank across sizes ------------------------
-    for label, model_name in cfg.LESS_MODEL_SIZES.items():
-        run_row(f"less_{label}", lambda meter, m=model_name:
-               methods.run_less(splits, m, meter=meter), gt, n_samples, all_metrics)
+    # -- LESS: every model size, at every rank in LESS_RANKS ------------------
+    # config.py: LESS_RANKS = [LESS_RANK] (one rank, one row per size, e.g.
+    # "less_4B_r16" -- same as historical behavior, just always rank-suffixed
+    # now). BIG_GPU_FINAL: LESS_RANKS = [8, 32], scoring every size at BOTH --
+    # shows the rank-starvation effect at 0.6B directly (agg rho +0.128 at r8
+    # vs +0.253 at r32) instead of hiding it behind one chosen rank.
+    for rank in cfg.LESS_RANKS:
+        for label, model_name in cfg.LESS_MODEL_SIZES.items():
+            run_row(f"less_{label}_r{rank}", lambda meter, m=model_name, r=rank:
+                   methods.run_less(splits, m, meter=meter, lora_rank=r), gt, n_samples, all_metrics,
+                   fingerprint=methods.less_fingerprint(args.n_eval, rank))
 
     # -- LoGRA (4B, 1.7B, 0.6B), same rank across sizes -----------------------
     for label, model_name in cfg.LOGRA_MODEL_SIZES.items():
         run_row(f"logra_{label}", lambda meter, m=model_name:
-               methods.run_logra(splits, m, meter=meter), gt, n_samples, all_metrics)
+               methods.run_logra(splits, m, meter=meter), gt, n_samples, all_metrics,
+               fingerprint=methods.logra_fingerprint(args.n_eval, cfg.LOGRA_RANK))
 
     # -- RDS+ ------------------------------------------------------------------
     run_row("rdsplus", lambda meter: methods.run_rdsplus(splits, meter=meter),
@@ -129,19 +144,17 @@ def main():
     run_row("tfidf", lambda meter: methods.run_tfidf(splits, meter=meter),
            gt, n_samples, all_metrics)
 
-    # less_fingerprint/logra_fingerprint are the single source of truth for
-    # "what config produced this row" -- Part 2 (and anything else that might
-    # reuse a LESS/LoGRA row instead of recomputing it) compares against
-    # exactly these same functions, so the writer and the reuse-checker can
-    # never drift out of sync with each other. They share several keys
-    # (n_eval/preset/gt_model/gt_lora_rank/attn/max_len/seed) with identical
-    # values, so merging is safe.
+    # This top-level "config" is informational only now -- each LESS/LoGRA
+    # row carries its OWN authoritative "config_fingerprint" (see run_row),
+    # since LESS is scored at multiple ranks (cfg.LESS_RANKS) in this same run
+    # and a single shared "less_rank" value can no longer describe every row.
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps({
-        "config": {**methods.less_fingerprint(args.n_eval),
-                  **methods.logra_fingerprint(args.n_eval),
-                  "n_train_a": cfg.N_TRAIN_A, "n_train_p": cfg.N_TRAIN_P,
-                  "influcoder_epochs": cfg.INFLUCODER_EPOCHS,
+        "config": {"preset": cfg.PRESET, "n_eval": args.n_eval, "attn": cfg.ATTN,
+                  "max_len": cfg.MAX_LEN, "seed": cfg.SEED, "gt_model": cfg.GT_MODEL,
+                  "gt_lora_rank": cfg.GT_LORA_RANK, "less_ranks": cfg.LESS_RANKS,
+                  "logra_rank": cfg.LOGRA_RANK, "n_train_a": cfg.N_TRAIN_A,
+                  "n_train_p": cfg.N_TRAIN_P, "influcoder_epochs": cfg.INFLUCODER_EPOCHS,
                   "influcoder_lr": cfg.INFLUCODER_LR,
                   "influcoder_hard_ratio": cfg.INFLUCODER_HARD_RATIO},
         "methods": {k: {kk: vv for kk, vv in v.items() if kk != "per_anchor"}

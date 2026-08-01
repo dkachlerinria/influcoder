@@ -1,0 +1,96 @@
+{
+  "config": {
+    "preset": "fig1_dolci",
+    "n_eval": 800,
+    "encoder_model": "jhu-clsp/ettin-encoder-68m",
+    "gt_model": "Qwen/Qwen3-4B",
+    "gt_lora_rank": 16,
+    "epochs": 8,
+    "hard_ratio": 0.0,
+    "lr": 5e-05,
+    "seed": 1,
+    "ratio": "1:2",
+    "anchor_point_n_train_a": 1500
+  },
+  "points": [
+    {
+      "n_train_anchors": 25,
+      "n_train_pool": 50,
+      "n_train_total": 75,
+      "untrained_agg": 0.26975135117398624,
+      "agg": 0.624361936503026,
+      "per_anchor_mean": 0.581010193128445,
+      "elapsed_s": 36.9
+    },
+    {
+      "n_train_anchors": 50,
+      "n_train_pool": 100,
+      "n_train_total": 150,
+      "untrained_agg": 0.26975135117398624,
+      "agg": 0.6683706927667075,
+      "per_anchor_mean": 0.6316109210178478,
+      "elapsed_s": 36.1
+    },
+    {
+      "n_train_anchors": 100,
+      "n_train_pool": 200,
+      "n_train_total": 300,
+      "untrained_agg": 0.26975135117398624,
+      "agg": 0.7330272785564544,
+      "per_anchor_mean": 0.6991667719655321,
+      "elapsed_s": 41.6
+    },
+    {
+      "n_train_anchors": 250,
+      "n_train_pool": 500,
+      "n_train_total": 750,
+      "untrained_agg": 0.26975135117398624,
+      "agg": 0.7599204105783002,
+      "per_anchor_mean": 0.72625213104154,
+      "elapsed_s": 61.0
+    },
+    {
+      "n_train_anchors": 500,
+      "n_train_pool": 1000,
+      "n_train_total": 1500,
+      "untrained_agg": 0.26975135117398624,
+      "agg": 0.7861942362409942,
+      "per_anchor_mean": 0.753161355174491,
+      "elapsed_s": 88.9
+    },
+    {
+      "n_train_anchors": 750,
+      "n_train_pool": 1500,
+      "n_train_total": 2250,
+      "untrained_agg": 0.26975135117398624,
+      "agg": 0.7988036778182467,
+      "per_anchor_mean": 0.7677690338536709,
+      "elapsed_s": 117.1
+    },
+    {
+      "n_train_anchors": 1000,
+      "n_train_pool": 2000,
+      "n_train_total": 3000,
+      "untrained_agg": 0.26975135117398624,
+      "agg": 0.8066208041338002,
+      "per_anchor_mean": 0.7760394646107968,
+      "elapsed_s": 148.3
+    },
+    {
+      "n_train_anchors": 1500,
+      "n_train_pool": 3000,
+      "n_train_total": 4500,
+      "untrained_agg": 0.26975135117398624,
+      "agg": 0.8184781069970422,
+      "per_anchor_mean": 0.7904998241447073,
+      "elapsed_s": 206.1
+    }
+  ],
+  "reference_lines": {
+    "less_4B_r32": 0.9754925867071668,
+    "less_1.7B_r8": 0.6305186023728162,
+    "logra_4B": 0.9501707658918217,
+    "logra_1.7B": 0.6264314006740637
+  },
+  "reference_lines_n_eval": 800
+}
