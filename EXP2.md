@@ -448,6 +448,35 @@ Verified leak-free via `methods/audit_leakage.py`'s `TOXICITY_MIXED_MODULES` (no
 scripts, 10 leak-free variants total across the whole document): 0 exact-prompt overlaps, 0 exact
 (prompt,response) pair overlaps.
 
+### 6.8 Extending the `hard_ratio` curve: does higher than 0.5 do even better?
+
+§6.7 showed `hard_ratio=0.5` beats `hard_ratio=0.0` by a wide margin at §6.4's original sample
+counts. Natural next question: does pushing hard mining further help more, or is 0.5 already past
+the peak? `influcoder_attribute_noleak_toxicity_mixed_hard075.py` is byte-identical to §6.4's
+winning `_mixed.py` with exactly one constant changed: `HARD_RATIO` 0.5 → **0.75** (not 1.0 —
+`FINDINGS.md` documented `hard_ratio=1.0` as a hard cliff in EXP1's setting, collapsing to +0.474
+vs. 0.75's +0.769 at the same pool size there, so 1.0 wasn't worth testing here). Confirmed by diff
+against the source script: only the docstring, save path, and that one constant differ.
+
+| `hard_ratio` | AUPRC | Δ vs. 0.5 |
+|---|---|---|
+| 0.0 (§6.7) | 0.4664 | −0.1496 |
+| **0.5 (§6.4, current best)** | **0.6160** | — |
+| 0.75 (this run) | 0.5861 | −0.0299 |
+
+Three points now trace an interior optimum, not a monotonic "more hard mining is always better"
+trend: 0.75 beats 0.0 by a wide margin (+0.1197) but falls short of 0.5. Consistent with the
+general shape `FINDINGS.md` found in EXP1's setting too (an interior optimum on the hard_ratio
+axis, with 1.0 as a known cliff) — this cross-source toxicity setup follows the same pattern
+rather than a different one. Training was stable (loss decreasing smoothly, best epoch = final
+epoch, no collapse), so this isn't a `hard_ratio=1.0`-style degenerate failure, just a milder
+overshoot past the optimum. **§6.4's `hard_ratio=0.5` config remains the best number in this
+document (0.6160)** — this run closes out the hard_ratio axis rather than displacing the winner.
+
+Verified leak-free via `methods/audit_leakage.py`'s `TOXICITY_MIXED_MODULES` (now 5 cross-source
+scripts, 11 leak-free variants total across the whole document): 0 exact-prompt overlaps, 0 exact
+(prompt,response) pair overlaps.
+
 ## 7. Reproduction
 
 ```bash
@@ -514,8 +543,15 @@ cd EXP2-datelm
   --config configs/toxicity-bias.yaml \
   --score_path results/toxicity-bias-influcoder-noleak-mixed-nohard/InfluCoder.pt
 
+# §6.8 original-scale mix, hard_ratio=0.75 (extends the hard_ratio curve past 0.5; needs a GPU +
+# wildguardmix HF access as above)
+../.venv_py311/bin/python methods/influcoder_attribute_noleak_toxicity_mixed_hard075.py
+../.venv_py311/bin/python evaluation/evaluate_application.py \
+  --config configs/toxicity-bias.yaml \
+  --score_path results/toxicity-bias-influcoder-noleak-mixed-hard075/InfluCoder.pt
+
 # Independent leak audit (CPU-only, no GPU/model loading needed -- a couple minutes,
-# dominated by re-downloading/streaming the external pools). Checks all ten runs above.
+# dominated by re-downloading/streaming the external pools). Checks all eleven runs above.
 ../.venv_h100/bin/python methods/audit_leakage.py
 ```
 
