@@ -895,13 +895,28 @@ partial measurement still isn't -- see the open item below.
 | Method | Task | Wall-clock | Notes |
 |---|---|---|---|
 | Rep-Sim | Counterfact | 62.7s total (45.2s forward-pass) | full 5,473-train + 66-ref forward pass, no backward pass |
+| InfluCoder (leak-free, 400m, best config: hard_ratio=0.25) | Counterfact | 195.0s total | `methods/run_influcoder_400m_best_counterfact.py` -- teacher grads + distill (8 epochs) + embed+score |
 
-Sanity check: re-evaluated the resulting score file against `evaluate_application.py` --
+Sanity check: re-evaluated the Rep-Sim score file against `evaluate_application.py` --
 Recall@50=0.3763, MRR=0.7907, matching the paper's published Rep-Sim numbers (0.376/0.790) closely.
 
 As expected, forward-only Rep-Sim is far cheaper than any backward-pass method: ~63s vs. Grad
 Sim's 1001s and LESS's 2585s on the same task (different GPUs, so read this as "same shape,
-not a precise ratio" until re-run on one GPU).
+not a precise ratio" until re-run on one GPU). InfluCoder's own 195s here (same GPU as Rep-Sim,
+directly comparable to that one row) sits well below Grad Sim/LESS too, though those two aren't
+on this GPU yet either -- see the open item below.
+
+**Reproducibility caveat, found while running the InfluCoder-400m timing row above:** re-running
+the exact best-config script (same `SEED=0`, same data draw, same hyperparameters, verified
+line-by-line against the original) on this RTX PRO 6000 Blackwell reproduced the training
+successfully but **did not reproduce the exact 0.4689/0.8739 score** -- this run scored
+Recall@50=0.4502/MRR=0.8165 instead. The script logic matches the original exactly, so the most
+likely explanation is GPU-architecture-level floating-point non-determinism accumulating over 8
+epochs of training (different kernel/reduction-order selection across GPU models), not a bug --
+but this hasn't been root-caused further, and it means **the 0.4689/0.8739 "best" number is not
+confirmed stable across different GPUs** without a multi-run variance check. Doesn't affect the
+195.0s timing measurement itself, which is what this section is about, but is a real caveat for
+anyone citing 0.4689 as a fixed number rather than "roughly ~0.45-0.47 depending on hardware."
 
 **Open item: get everything on one GPU.** This session now has Rep-Sim (RTX PRO 6000 Blackwell),
 Grad Sim/LESS/InfluCoder-Counterfact (A40), and InfluCoder's various leak-free configs (RTX 6000
