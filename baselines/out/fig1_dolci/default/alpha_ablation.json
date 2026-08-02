@@ -1,27 +1,68 @@
 {
   "0.0": {
-    "agg_rho": 0.7463625450180071,
-    "best_epoch": 3,
-    "per_anchor": 0.7234208883553421
+    "0": {
+      "agg_rho": 0.7894,
+      "best_epoch": 3
+    },
+    "1": {
+      "agg_rho": 0.7472,
+      "best_epoch": 2
+    },
+    "2": {
+      "agg_rho": 0.7593,
+      "best_epoch": 3
+    }
   },
   "0.25": {
-    "agg_rho": 0.7447298919567827,
-    "best_epoch": 3,
-    "per_anchor": 0.7205090036014405
+    "0": {
+      "agg_rho": 0.7822,
+      "best_epoch": 4
+    },
+    "1": {
+      "agg_rho": 0.7608,
+      "best_epoch": 3
+    },
+    "2": {
+      "agg_rho": 0.7481,
+      "best_epoch": 2
+    }
   },
   "0.5": {
-    "agg_rho": 0.7481872749099638,
-    "best_epoch": 3,
-    "per_anchor": 0.723420888355342
+    "0": {
+      "agg_rho": 0.7747,
+      "best_epoch": 3
+    },
+    "1": {
+      "agg_rho": 0.7669,
+      "best_epoch": 4
+    },
+    "2": {
+      "agg_rho": 0.7681,
+      "best_epoch": 1
+    }
   },
   "0.75": {
-    "agg_rho": 0.7503001200480192,
-    "best_epoch": 3,
-    "per_anchor": 0.7205224489795917
+    "0": {
+      "agg_rho": 0.7689,
+      "best_epoch": 3
+    },
+    "1": {
+      "agg_rho": 0.7784,
+      "best_epoch": 3
+    },
+    "2": {
+      "agg_rho": 0.75,
+      "best_epoch": 2
+    }
   },
   "1.0": {
-    "agg_rho": 0.7713325330132053,
-    "best_epoch": 3,
-    "per_anchor": 0.7482199279711884
+    "0": {
+      "agg_rho": 0.7887,
+      "best_epoch": 4
+    },
+    "1": {
+      "agg_rho": 0.7877,
+      "best_epoch": 4
+    }
   }
 }

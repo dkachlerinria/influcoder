@@ -27,17 +27,15 @@ def main():
     train_a = [s.text for s in splits["train_anchors"][:cfg.N_TRAIN_A]]
     train_p = [s.text for s in splits["train_pool"][:cfg.N_TRAIN_P]]
 
-    alphas = [0.5, 0.75, 1.0]
+    alphas = [0.0, 0.25, 0.5, 0.75, 1.0]
     seeds = [0, 1, 2]
     all_metrics = {}
 
-    print(f"Resuming alpha ablation: {alphas} over seeds {seeds} for Influcoder 68m ({args.epochs} epochs)")
+    print(f"Running alpha ablation: {alphas} over seeds {seeds} for Influcoder 68m ({args.epochs} epochs)")
     
     for alpha in alphas:
         all_metrics[alpha] = {}
         for seed in seeds:
-            if alpha == 0.5 and seed == 0:
-                continue
             print(f"\n########## Alpha = {alpha}, Seed = {seed} ##########")
             enc, log, final, untrained = train.train_influcoder(
                 cfg.ENCODER_MODELS["68m"], train_a, train_p, targets,
@@ -59,7 +57,7 @@ def main():
             gc.collect()
             torch.cuda.empty_cache()
 
-    OUT = Path("baselines/out") / cfg.PRESET / cfg.PROFILE / "alpha_ablation_seeds_3.json"
+    OUT = Path("baselines/out") / cfg.PRESET / cfg.PROFILE / "alpha_ablation.json"
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(all_metrics, indent=2))
     print(f"\nWrote ablation results to {OUT}")
