@@ -1,0 +1,16 @@
+{
+  "Grad_Dot": {
+    "task": "Counterfact",
+    "wall_s": 525.4784862730012,
+    "recall_at_50": 0.4658480364358013,
+    "mrr": 0.7681717600962066,
+    "gpu": "Quadro RTX 8000 (vercors5-1.grenoble.grid5000.fr)"
+  },
+  "Grad_Sim": {
+    "task": "Counterfact",
+    "wall_s": 567.9848663209996,
+    "recall_at_50": 0.49216707255981174,
+    "mrr": 0.8359848484848484,
+    "gpu": "Quadro RTX 8000 (vercors5-1.grenoble.grid5000.fr)"
+  }
+}

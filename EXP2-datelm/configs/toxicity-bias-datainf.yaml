@@ -1,0 +1,14 @@
+method: DataInf
+
+task: "Toxicity/Bias"
+subset: "XSTest-response-Het"
+
+base_model_path: "EleutherAI/pythia-1b"
+checkpoint: "DataAttributionEval/Pythia-1b-XSTest-response-Het"
+
+device: "cuda"
+
+regularization: 1e-5
+fim_estimate_data_ratio: 1.0
+
+save_path: ./results/toxicity-bias-datainf/

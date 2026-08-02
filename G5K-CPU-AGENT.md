@@ -145,3 +145,36 @@ Fixes:
   that would otherwise cost a full launch cycle.
 - Set `HF_HUB_ENABLE_HF_TRANSFER` off / ignore its deprecation warning; `TOKENIZERS_PARALLELISM=false`
   keeps logs readable.
+
+---
+
+## 8. Never kill a process without confirming who launched it, first ⭐
+
+**The mistake (real incident):** an orchestrating agent found an unexpected `dattri.py` process
+running on a GPU job and, based on **timing coincidence alone** (it had just told a *different*
+session to do something similar, on a different GPU), assumed it was that other session's mistake
+and killed it (`kill -TERM`). It turned out to be a **different session's own legitimate,
+self-initiated work**, running on a GPU *that session itself held* — nothing to do with the session
+the orchestrator had just been talking to. The kill was based on inference, never verified.
+
+**The trick:** before touching any process you didn't personally launch this turn:
+- Check **whose job actually owns the GPU it's running on** — `oarstat -f -j <id>` →
+  `assigned_hostnames`/`owner`, cross-referenced against which session reserved that specific job.
+  A process running on a GPU held by session A's own job is almost certainly session A's own work,
+  *even if* you were just mid-conversation with session B and the timing looks suspicious. Timing
+  coincidence is not evidence of causation.
+- If genuinely ambiguous, **ask before killing**: `tmux send-keys` a question to the session that
+  might own it, or grep its transcript `.jsonl` for when/why it launched that exact command. Both
+  are cheap; an unverified kill is not.
+- This applies doubly on a shared account (other agents, other users) and even *within* your own
+  fleet of sessions — "it's a session I control" is not the same as "I confirmed this specific
+  process is mine to kill."
+
+**Why it matters beyond the wasted GPU time:** the killed session has no idea it was killed
+externally. It will typically misattribute the death to something plausible-sounding but wrong
+("a one-off race," a driver hiccup) and log that wrong conclusion into its own transcript —
+quietly corrupting its own record of its own reliability, which can mislead it (or whoever reads
+that transcript later) well after the actual incident.
+
+**Default: never kill or reuse a job/process you didn't personally, verifiably start — check
+ownership first, every time, no exceptions for "it's probably fine."**

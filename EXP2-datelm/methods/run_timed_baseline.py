@@ -24,11 +24,27 @@ from __future__ import annotations
 
 import argparse
 import json
+import socket
+import subprocess
 import sys
 import time
 from pathlib import Path
 
 from omegaconf import OmegaConf
+
+
+def detect_gpu_label() -> str:
+    """Auto-detect the actual GPU this run is on -- never hardcode a model
+    name, since this script is meant to run on whichever GPU is reserved at
+    the time, and a stale hardcoded label would silently mislabel results."""
+    try:
+        name = subprocess.check_output(
+            ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
+            text=True,
+        ).strip().splitlines()[0]
+    except Exception:
+        name = "UNKNOWN"
+    return f"{name} ({socket.getfqdn()})"
 
 project_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(project_root))
@@ -94,7 +110,7 @@ def main():
         "wall_s": wall_s,
         "recall_at_50": recall50,
         "mrr": mrr,
-        "gpu": "RTX PRO 6000 Blackwell (vercors18-1.grenoble.grid5000.fr)",
+        "gpu": detect_gpu_label(),
     }
     SUMMARY_PATH.write_text(json.dumps(summary, indent=2))
     print(f"wrote {SUMMARY_PATH}")
