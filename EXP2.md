@@ -895,16 +895,22 @@ partial measurement still isn't -- see the open item below.
 | Method | Task | Wall-clock | Notes |
 |---|---|---|---|
 | Rep-Sim | Counterfact | 62.7s total (45.2s forward-pass) | full 5,473-train + 66-ref forward pass, no backward pass |
-| InfluCoder (leak-free, 400m, best config: hard_ratio=0.25) | Counterfact | 195.0s total | `methods/run_influcoder_400m_best_counterfact.py` -- teacher grads + distill (8 epochs) + embed+score |
+| **InfluCoder inference** (leak-free, 400m, best config: hard_ratio=0.25) | Counterfact | **3.3s** | embed+score of the full 5,473-train + 66-ref set with the already-distilled encoder -- the number actually comparable to Rep-Sim/Grad Sim/LESS's rows, since those methods have no separate "training" step to amortize |
+| ↳ InfluCoder one-time distillation (same run) | Counterfact | ~191.7s (195.0s total − 3.3s inference) | teacher-gradient extraction on 3,400 external rows (~68s, unbatched, same `batch_size=1` convention as Grad Sim/LESS) + 8-epoch distillation of the 400m student encoder (~120s, the dominant cost -- NOT the teacher-gradient pass, which is smaller than the distillation loop at this encoder size) -- paid once, not per query |
 
 Sanity check: re-evaluated the Rep-Sim score file against `evaluate_application.py` --
 Recall@50=0.3763, MRR=0.7907, matching the paper's published Rep-Sim numbers (0.376/0.790) closely.
 
 As expected, forward-only Rep-Sim is far cheaper than any backward-pass method: ~63s vs. Grad
 Sim's 1001s and LESS's 2585s on the same task (different GPUs, so read this as "same shape,
-not a precise ratio" until re-run on one GPU). InfluCoder's own 195s here (same GPU as Rep-Sim,
-directly comparable to that one row) sits well below Grad Sim/LESS too, though those two aren't
-on this GPU yet either -- see the open item below.
+not a precise ratio" until re-run on one GPU). **InfluCoder's actual inference cost (3.3s) is
+~14x cheaper than Rep-Sim's 45.2s forward pass on the same GPU** -- this is InfluCoder's real
+value proposition made concrete: once the one-time distillation is paid, scoring is a forward
+pass through a small (400m, or 68m elsewhere in this doc) encoder instead of the full 1B-parameter
+checkpoint every other method (including Rep-Sim) has to forward/backward-pass through on every
+run. The ~192s distillation cost is real and shouldn't be hidden, but it's a setup cost that
+amortizes across every future query against this checkpoint, not a per-query cost like the other
+methods' numbers are.
 
 **Reproducibility caveat, found while running the InfluCoder-400m timing row above:** re-running
 the exact best-config script (same `SEED=0`, same data draw, same hyperparameters, verified
@@ -918,10 +924,16 @@ confirmed stable across different GPUs** without a multi-run variance check. Doe
 195.0s timing measurement itself, which is what this section is about, but is a real caveat for
 anyone citing 0.4689 as a fixed number rather than "roughly ~0.45-0.47 depending on hardware."
 
-**Open item: get everything on one GPU.** This session now has Rep-Sim (RTX PRO 6000 Blackwell),
-Grad Sim/LESS/InfluCoder-Counterfact (A40), and InfluCoder's various leak-free configs (RTX 6000
-Ada / Quadro RTX 8000 / H100 NVL / A100-40GB, whichever GPU happened to be free when each fork
-ran) scattered across at least four different GPU models. None of these numbers should be
-cross-compared as if they were controlled timings. A real "same GPU" comparison needs Grad Dot/
-Grad Sim/LESS/DataInf/EKFAC/Rep-Sim/InfluCoder all re-run back-to-back on one single reserved GPU,
-same session, same warm/cold cache state for each -- not done yet.
+**Open item: get everything on one GPU.** This session now has Rep-Sim + InfluCoder-inference
+(RTX PRO 6000 Blackwell), Grad Sim/LESS/InfluCoder-Counterfact from §9's table (A40), and
+InfluCoder's various leak-free configs (RTX 6000 Ada / Quadro RTX 8000 / H100 NVL / A100-40GB,
+whichever GPU happened to be free when each fork ran) scattered across at least four different GPU
+models. None of these numbers should be cross-compared as if they were controlled timings except
+the Rep-Sim/InfluCoder pair directly above, which share a GPU. A real "same GPU" comparison needs
+Grad Dot/Grad Sim/LESS/DataInf/EKFAC/Rep-Sim/InfluCoder all re-run back-to-back on one single
+reserved GPU, same session, same warm/cold cache state for each -- not done yet. When Grad Sim/LESS
+get re-measured on this GPU, apply the same inference-vs-setup split used above for InfluCoder --
+Grad Sim/LESS have no separate training step (every run computes fresh exact gradients, there's
+nothing to amortize), so their number is inference-only by construction and directly comparable to
+InfluCoder's 3.3s row without needing a split of their own; the split only exists for InfluCoder
+because it alone has a one-time cost the others don't.
