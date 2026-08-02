@@ -218,6 +218,11 @@ run-to-run noise. Distributional match quality doesn't appear to be what's bottl
 number; whatever's capping InfluCoder below Rep-Sim/Grad Sim/LESS here isn't the toxic-source
 choice.
 
+**Superseded by §6.4/§6.12**: a cross-source external mix (WildGuardMix anchors + ToxicChat
+candidates) reaches 0.6160 at the 68m default encoder, and **0.7651 at `ettin-400m`** — beating
+every method in the baseline table above, LESS included. Don't cite this section's numbers as
+InfluCoder's ceiling on this task; see §6.12 first.
+
 ## 6. Ablation: more external samples, hard_ratio/epochs held fixed
 
 Tests whether the leak-free recommended results (§5) are data-starved: scale up the external
@@ -641,6 +646,58 @@ modules: the 400m hard_ratio sweep and both bigger-data-at-400m scripts): 0 exac
 0 subject overlaps, 0 exact (prompt,response) pair overlaps for all three — 19 leak-free variants
 total across the whole document, all clean.
 
+## 6.12 Encoder-size sweep on the toxicity cross-source mix
+
+§6.10's encoder-size sweep only covered Counterfact. The toxicity cross-source mix (§6.4,
+`influcoder_attribute_noleak_toxicity_mixed.py`, AUPRC=0.6160, the best toxicity number until this
+section) never had one — worth checking whether the same 400m/1b gain that helped Counterfact
+transfers here, especially since this config's total external data (~1,800 rows: 100 anchors + 300
+ToxicChat + 1,000 UltraChat candidates + 100 WildGuardMix + 300 UltraChat held-out eval) is smaller
+than Counterfact's moredata scale (3,400), closer to the range `FINDINGS.md` (EXP1) documented
+150m/400m collapsing in at default `lr=5e-5` — this was a real, watched-for risk, not assumed safe
+by analogy.
+
+`influcoder_attribute_noleak_toxicity_mixed_encodersweep.py`: identical data draw to §6.4's script
+(same `SEED=0`, same WildGuardMix-anchor/ToxicChat-candidate/UltraChat-benign role assignment,
+`HARD_RATIO=0.5`, `EPOCHS=8`), teacher gradients for the fixed draw computed once and reused across
+encoder sizes (same pattern as §6.10's Counterfact sweep). Per-epoch eval Spearman was watched for
+every size to catch a collapse pattern (metric cratering after an early peak despite falling train
+loss) rather than trusting a blind final AUPRC number:
+
+| Encoder | Per-epoch agg ρ | Collapsed? | AUPRC |
+|---|---|---|---|
+| 68m (§6.4, existing) | — | — | 0.6160 |
+| 150m | +0.317 → +0.568 (peak ep.6) → +0.556 | No | 0.5307 |
+| **400m** | +0.418 → **+0.638** (final epoch, still rising) | No | **0.7651** |
+| 1b | +0.482 → +0.596 (peak ep.8) | No | 0.7343 |
+
+No collapse at any size — all three curves rise smoothly to a late-epoch peak, the risk flagged
+above didn't materialize.
+
+**400m is a large, clean win: AUPRC 0.7651, +0.149 over the existing 0.6160 best.** This is now
+the best result anywhere in this document on *either* task, and it beats every DATE-LM paper
+baseline on this task including LESS (0.734) — the only baseline that had, until now, been out of
+reach on any InfluCoder configuration tried. 1b also clears LESS's baseline (0.7343) but doesn't
+beat 400m. 150m is the one regression — worse than the 68m default (0.5307 vs 0.6160), the same
+"150m is often the weak middle size" pattern EXP1's `FINDINGS.md` noted, now confirmed on a second
+task/pool.
+
+**New current best AUPRC for Toxicity/Bias filtering: `ettin-400m` on the §6.4 cross-source mix
+(WildGuardMix anchor/eval + ToxicChat candidate), `hard_ratio=0.5`, `epochs=8` → AUPRC=0.7651.**
+This supersedes §5.2/§6.4's 0.6160 and every other toxicity number in this document. Unlike
+Counterfact, where 400m/hard_ratio=0.25 closed most but not all of the gap to the strongest paper
+baseline (LESS's Recall@50), here InfluCoder now outright beats every DATE-LM baseline on this
+task, LESS included.
+
+Verified leak-free via `methods/audit_leakage.py`'s extended `TOXICITY_MIXED_MODULES` (one new
+module — all three sizes share one anchor/candidate/eval draw, same as §6.10's Counterfact sweep,
+so auditing once covers all three): 0 exact-prompt overlaps, 0 exact (prompt,response) pair
+overlaps — 20 leak-free variants total across the whole document, all clean.
+
+Not yet tried: hard_ratio tuning at 400m for this task (§6.11's finding that hard_ratio's optimum
+is encoder-size-dependent for Counterfact suggests the same could be true here — 0.5 has not been
+confirmed optimal at 400m specifically, only carried over unchanged from the 68m default).
+
 ## 7. Reproduction
 
 ```bash
@@ -743,8 +800,15 @@ cd EXP2-datelm
   --score_path results/factual-attribution-influcoder-noleak-extquery-moredata-400m-hard025/InfluCoder.pt
 # (repeat --score_path for the moredata-400m-hard075/bigger-400m/bigger-400m-hard025 result dirs)
 
+# Toxicity encoder-size sweep (§6.12)
+../.venv_h100/bin/python methods/influcoder_attribute_noleak_toxicity_mixed_encodersweep.py
+../.venv_h100/bin/python evaluation/evaluate_application.py \
+  --config configs/toxicity-bias.yaml \
+  --score_path results/toxicity-bias-influcoder-noleak-mixed-400m/InfluCoder.pt
+# (repeat --score_path for the mixed-150m/mixed-1b result dirs)
+
 # Independent leak audit (CPU-only, no GPU/model loading needed -- a couple minutes,
-# dominated by re-downloading/streaming the external pools). Checks all nineteen runs above.
+# dominated by re-downloading/streaming the external pools). Checks all twenty runs above.
 ../.venv_h100/bin/python methods/audit_leakage.py
 ```
 
@@ -768,6 +832,13 @@ cd EXP2-datelm
   and matches EXP1's documented dilution-at-hard_ratio=0 pattern. §6.4's 0.6160 remains the best
   result and the standing candidate for §5's recommended row; a bigger pool *at* `hard_ratio=0.5`
   is untested and would be the natural next step if this gets revisited.
+- **UPDATE (§6.12): the "bigger pool at hard_ratio=0.5" question above was answered indirectly —
+  not by scaling the pool, but by scaling the encoder.** `ettin-400m` on the exact same §6.4 mix
+  (same sample counts, same `hard_ratio=0.5`) reaches **AUPRC=0.7651**, beating every DATE-LM
+  baseline on this task including LESS (0.734). This is now the best result in the whole document,
+  on either task, and is the new standing candidate for §5.2's recommended row. hard_ratio tuning
+  at 400m specifically (mirroring §6.11's Counterfact result, where 0.25 beat 0.5) remains untested
+  for toxicity and is the natural next step.
 - Only Pythia-1B has been leak-free-fixed. DATE-LM also reports Llama-3.2-1B and Llama-3.1-8B
   for both tasks; neither has been redone with external data yet.
 
