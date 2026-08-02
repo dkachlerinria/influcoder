@@ -1,0 +1,14 @@
+method: DataInf
+
+task: "Counterfact"
+subset: "Pythia-1b"
+
+base_model_path: "EleutherAI/pythia-1b"
+checkpoint: "DataAttributionEval/Pythia-1b-counterfactual"
+
+device: "cuda"
+
+regularization: 1e-5
+fim_estimate_data_ratio: 1.0
+
+save_path: ./results/factual-attribution-datainf/

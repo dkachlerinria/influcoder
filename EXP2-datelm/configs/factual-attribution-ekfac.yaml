@@ -1,0 +1,13 @@
+method: EKFAC
+
+task: "Counterfact"
+subset: "Pythia-1b"
+
+base_model_path: "EleutherAI/pythia-1b"
+checkpoint: "DataAttributionEval/Pythia-1b-counterfactual"
+
+device: "cuda"
+
+damping: 1e-7
+
+save_path: ./results/factual-attribution-ekfac/
