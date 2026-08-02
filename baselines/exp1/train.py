@@ -30,7 +30,8 @@ def train_influcoder(encoder_model: str, train_anchor_texts: list[str],
                      hard_ratio: float | None = None, lr: float | None = None,
                      seed: int | None = None, encoder_max_len: int | None = None,
                      select_best_on: str | None = None,
-                     restore_best: bool | None = None):
+                     restore_best: bool | None = None,
+                     alpha: float | None = None):
     """Load a fresh encoder and distill it against `targets`.
 
     Every keyword defaults to the canonical value in `config.py` -- callers
@@ -82,7 +83,7 @@ def train_influcoder(encoder_model: str, train_anchor_texts: list[str],
     log = distill(enc, train_anchor_texts, train_pool_texts, targets,
                  epochs=epochs, hard_ratio=hard_ratio, lr=lr, seed=seed,
                  epoch_eval=epoch_eval, select_best_on=select_best_on,
-                 restore_best=restore_best)
+                 restore_best=restore_best, **({"alpha": alpha} if alpha is not None else {}))
     final_metrics = log["epoch_metrics"][epochs - 1] if has_eval else None
     return enc, log, final_metrics, untrained_metrics
 
