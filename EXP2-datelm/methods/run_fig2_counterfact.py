@@ -198,11 +198,14 @@ def run_bm25():
     retriever = bm25s.BM25()
     retriever.index(train_tokens)
 
-    query_tokens = bm25s.tokenize(ref_texts, stopwords=BM25_STOPWORDS)
-    # Full [n_ref, n_train] score matrix (every train doc, in original order,
-    # per ref query) -- NOT top-k retrieval, which would drop/reorder docs and
+    # get_scores() takes ONE query's raw string tokens at a time (not the
+    # batch-tokenized/ID-mapped object bm25s.tokenize() returns by default),
+    # so tokenize with return_ids=False and loop -- gives the full
+    # [n_ref, n_train] score matrix (every train doc, in original order, per
+    # ref query), NOT top-k retrieval, which would drop/reorder docs and
     # break the Recall@50/MRR convention every other method here uses.
-    scores = retriever.get_scores(query_tokens)  # [n_ref, n_train]
+    query_tokens = bm25s.tokenize(ref_texts, stopwords=BM25_STOPWORDS, return_ids=False)
+    scores = np.stack([retriever.get_scores(qt) for qt in query_tokens])  # [n_ref, n_train]
     wall_s = time.perf_counter() - t0
 
     save_path = RESULTS_DIR / "fig2-counterfact-bm25" / "BM25.pt"
