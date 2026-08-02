@@ -897,20 +897,31 @@ partial measurement still isn't -- see the open item below.
 | Rep-Sim | Counterfact | 62.7s total (45.2s forward-pass) | full 5,473-train + 66-ref forward pass, no backward pass |
 | **InfluCoder inference** (leak-free, 400m, best config: hard_ratio=0.25) | Counterfact | **3.3s** | embed+score of the full 5,473-train + 66-ref set with the already-distilled encoder -- the number actually comparable to Rep-Sim/Grad Sim/LESS's rows, since those methods have no separate "training" step to amortize |
 | ↳ InfluCoder one-time distillation (same run) | Counterfact | ~191.7s (195.0s total − 3.3s inference) | teacher-gradient extraction on 3,400 external rows (~68s, unbatched, same `batch_size=1` convention as Grad Sim/LESS) + 8-epoch distillation of the 400m student encoder (~120s, the dominant cost -- NOT the teacher-gradient pass, which is smaller than the distillation loop at this encoder size) -- paid once, not per query |
+| **LESS** (`methods/dattri.py`) | Counterfact | **1022.1s (~17.0 min)** | full run, `results/factual-attribution-less/LESS.pt`; sanity check: Recall@50=0.4955/MRR=0.7769 vs. paper's 0.500/0.772 -- close but not exact, consistent with the GPU-dependent variance already flagged for InfluCoder above |
 
 Sanity check: re-evaluated the Rep-Sim score file against `evaluate_application.py` --
 Recall@50=0.3763, MRR=0.7907, matching the paper's published Rep-Sim numbers (0.376/0.790) closely.
 
 As expected, forward-only Rep-Sim is far cheaper than any backward-pass method: ~63s vs. Grad
-Sim's 1001s and LESS's 2585s on the same task (different GPUs, so read this as "same shape,
-not a precise ratio" until re-run on one GPU). **InfluCoder's actual inference cost (3.3s) is
-~14x cheaper than Rep-Sim's 45.2s forward pass on the same GPU** -- this is InfluCoder's real
-value proposition made concrete: once the one-time distillation is paid, scoring is a forward
-pass through a small (400m, or 68m elsewhere in this doc) encoder instead of the full 1B-parameter
-checkpoint every other method (including Rep-Sim) has to forward/backward-pass through on every
-run. The ~192s distillation cost is real and shouldn't be hidden, but it's a setup cost that
-amortizes across every future query against this checkpoint, not a per-query cost like the other
-methods' numbers are.
+Sim's 1001s and LESS's 2585s on the A40 from §9's table (different GPU, so read that specific
+comparison as "same shape, not a precise ratio"). **On this GPU specifically**, now that LESS has
+been re-run here too, the same-hardware picture is clean:
+
+| Method | Wall-clock (RTX PRO 6000 Blackwell) |
+|---|---|
+| InfluCoder (inference only) | 3.3s |
+| Rep-Sim | 62.7s (18.9x slower than InfluCoder) |
+| LESS | 1022.1s (309.7x slower than InfluCoder, 16.3x slower than Rep-Sim) |
+
+**InfluCoder's actual inference cost (3.3s) is ~14-310x cheaper than every other method measured
+on this GPU** -- this is InfluCoder's real value proposition made concrete: once the one-time
+distillation is paid, scoring is a forward pass through a small (400m, or 68m elsewhere in this
+doc) encoder instead of the full 1B-parameter checkpoint every other method (including Rep-Sim and
+LESS) has to forward/backward-pass through on every single run. The ~192s InfluCoder distillation
+cost is real and shouldn't be hidden, but it's a one-time setup cost that amortizes across every
+future query against this checkpoint -- even a single InfluCoder run (distillation + inference,
+~195s total) is still 5.2x faster than one LESS run (1022.1s), and every subsequent query after
+that first one costs InfluCoder 3.3s against LESS's 1022.1s again from scratch.
 
 **Reproducibility caveat, found while running the InfluCoder-400m timing row above:** re-running
 the exact best-config script (same `SEED=0`, same data draw, same hyperparameters, verified
@@ -924,16 +935,11 @@ confirmed stable across different GPUs** without a multi-run variance check. Doe
 195.0s timing measurement itself, which is what this section is about, but is a real caveat for
 anyone citing 0.4689 as a fixed number rather than "roughly ~0.45-0.47 depending on hardware."
 
-**Open item: get everything on one GPU.** This session now has Rep-Sim + InfluCoder-inference
-(RTX PRO 6000 Blackwell), Grad Sim/LESS/InfluCoder-Counterfact from §9's table (A40), and
-InfluCoder's various leak-free configs (RTX 6000 Ada / Quadro RTX 8000 / H100 NVL / A100-40GB,
-whichever GPU happened to be free when each fork ran) scattered across at least four different GPU
-models. None of these numbers should be cross-compared as if they were controlled timings except
-the Rep-Sim/InfluCoder pair directly above, which share a GPU. A real "same GPU" comparison needs
-Grad Dot/Grad Sim/LESS/DataInf/EKFAC/Rep-Sim/InfluCoder all re-run back-to-back on one single
-reserved GPU, same session, same warm/cold cache state for each -- not done yet. When Grad Sim/LESS
-get re-measured on this GPU, apply the same inference-vs-setup split used above for InfluCoder --
-Grad Sim/LESS have no separate training step (every run computes fresh exact gradients, there's
-nothing to amortize), so their number is inference-only by construction and directly comparable to
-InfluCoder's 3.3s row without needing a split of their own; the split only exists for InfluCoder
-because it alone has a one-time cost the others don't.
+**Open item: get everything on one GPU.** Rep-Sim, InfluCoder (inference + distillation), and now
+LESS have all been re-run on this single GPU (RTX PRO 6000 Blackwell) and are directly comparable
+to each other (table above). Still outstanding on this same GPU: **Grad Dot, DataInf, EKFAC** --
+§9's A40 numbers for Grad Sim (1001s)/LESS (2585s) are NOT re-measured here and shouldn't be
+diffed against this GPU's LESS number (1022.1s) as if hardware-controlled, even though they
+happen to be in a similar ballpark. InfluCoder's various leak-free configs elsewhere in this doc
+(RTX 6000 Ada / Quadro RTX 8000 / H100 NVL / A100-40GB, whichever GPU happened to be free when
+each fork ran) also remain on their own separate hardware and aren't part of this comparison.
