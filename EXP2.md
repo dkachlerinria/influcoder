@@ -875,3 +875,38 @@ independently re-verified beyond one run each (no multi-seed variance estimate);
 (numbers are for a single A40, not the RTX 6000 Ada used for the §4-§6 InfluCoder runs, so don't
 diff these against §4's "~1-2 min" docstring estimate directly). Completing the LESS/InfluCoder
 Toxicity/Bias cells is left as a follow-up if this comparison becomes load-bearing.
+
+### 9.1 Rep-Sim / Counterfact -- measured on a THIRD, different GPU (not directly comparable above)
+
+`methods/run_repsim_counterfact.py`: DATE-LM's Rep-Sim baseline (forward-pass-only -- last-token
+hidden state as the representation, cosine similarity to the ref set, no backward pass at all)
+re-hosted against `get_dataset("Counterfact", "Pythia-1b")` via the same `checkpoints_load_func`
+every other method here uses (`baselines/repsim.py`, this repo's own vendored implementation, is
+built around jsonl files rather than `get_dataset()`, so this mirrors its actual algorithm rather
+than calling it directly). `batch_size=1`, matching the convention above.
+
+**Measured on an RTX PRO 6000 Blackwell (grenoble), not the A40 the Grad Sim/LESS/InfluCoder row
+above used, nor the RTX 6000 Ada §4-§6 used** -- a third GPU model. Don't treat this number as
+directly diffable against the table above; it's here for Rep-Sim's own accuracy/cost shape, not
+for a cross-method ranking on identical hardware. Getting genuinely consistent numbers (the
+user's original ask) needs every method re-run on one single GPU in one sitting, which this
+partial measurement still isn't -- see the open item below.
+
+| Method | Task | Wall-clock | Notes |
+|---|---|---|---|
+| Rep-Sim | Counterfact | 62.7s total (45.2s forward-pass) | full 5,473-train + 66-ref forward pass, no backward pass |
+
+Sanity check: re-evaluated the resulting score file against `evaluate_application.py` --
+Recall@50=0.3763, MRR=0.7907, matching the paper's published Rep-Sim numbers (0.376/0.790) closely.
+
+As expected, forward-only Rep-Sim is far cheaper than any backward-pass method: ~63s vs. Grad
+Sim's 1001s and LESS's 2585s on the same task (different GPUs, so read this as "same shape,
+not a precise ratio" until re-run on one GPU).
+
+**Open item: get everything on one GPU.** This session now has Rep-Sim (RTX PRO 6000 Blackwell),
+Grad Sim/LESS/InfluCoder-Counterfact (A40), and InfluCoder's various leak-free configs (RTX 6000
+Ada / Quadro RTX 8000 / H100 NVL / A100-40GB, whichever GPU happened to be free when each fork
+ran) scattered across at least four different GPU models. None of these numbers should be
+cross-compared as if they were controlled timings. A real "same GPU" comparison needs Grad Dot/
+Grad Sim/LESS/DataInf/EKFAC/Rep-Sim/InfluCoder all re-run back-to-back on one single reserved GPU,
+same session, same warm/cold cache state for each -- not done yet.
