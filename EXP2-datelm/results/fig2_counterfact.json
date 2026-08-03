@@ -31,10 +31,10 @@
   },
   "gradsim": {
     "task": "Counterfact",
-    "wall_s": 378.35108452598797,
-    "recall_at_50": 0.49249542830603726,
+    "wall_s": 859.3596468209944,
+    "recall_at_50": 0.4923807942025515,
     "mrr": 0.8359848484848484,
-    "gpu": "NVIDIA RTX 6000 Ada Generation (vercors14-4.grenoble.grid5000.fr)"
+    "gpu": "NVIDIA RTX A5000 (vercors9-7.grenoble.grid5000.fr)"
   },
   "ekfac": {
     "task": "Counterfact",

@@ -19,9 +19,9 @@
   },
   "gradsim": {
     "task": "Toxicity/Bias",
-    "wall_s": 570.7912480689993,
-    "auprc": 0.6307681909595015,
-    "gpu": "NVIDIA RTX 6000 Ada Generation (vercors14-4.grenoble.grid5000.fr)"
+    "wall_s": 1281.7822824239993,
+    "auprc": 0.6324480246805181,
+    "gpu": "NVIDIA RTX A5000 (vercors9-7.grenoble.grid5000.fr)"
   },
   "influcoder": {
     "task": "Toxicity/Bias",
