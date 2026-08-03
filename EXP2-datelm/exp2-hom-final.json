@@ -1,0 +1,48 @@
+{
+  "bm25": {
+    "task": "Toxicity/Bias",
+    "wall_s": 5.2547731751110405,
+    "auprc": 0.29507158194194516,
+    "gpu": "NVIDIA A40 (abacus25-4.rennes.grid5000.fr)"
+  },
+  "repsim": {
+    "task": "Toxicity/Bias",
+    "wall_s": 308.90985521699986,
+    "auprc": 0.4247208989943925,
+    "gpu": "NVIDIA RTX A5000 (vercors9-1.grenoble.grid5000.fr)"
+  },
+  "gradsim": {
+    "task": "Toxicity/Bias",
+    "wall_s": 1280.9478828339998,
+    "auprc": 0.688629459175576,
+    "gpu": "NVIDIA RTX A5000 (vercors10-1.grenoble.grid5000.fr)"
+  },
+  "less": {
+    "task": "Toxicity/Bias",
+    "wall_s": 4199.353609860998,
+    "auprc": 0.7318079537874367,
+    "gpu": "NVIDIA RTX A5000 (vercors9-5.grenoble.grid5000.fr)"
+  },
+  "datainf": {
+    "task": "Toxicity/Bias",
+    "wall_s": 5079.390107776038,
+    "auprc": 0.17639480204433264,
+    "gpu": "NVIDIA A40 (abacus25-4.rennes.grid5000.fr)"
+  },
+  "semantic": {
+    "task": "Toxicity/Bias",
+    "wall_s": 422.81988537707366,
+    "auprc": 0.5550921573793662,
+    "gpu": "NVIDIA A40 (abacus25-4.rennes.grid5000.fr)",
+    "setup_s": 12.977272059069946,
+    "setup_note": "get_dataset + encoder load, NOT included in wall_s -- excluded to match InfluCoder's inference-only wall_s convention (Semantic is InfluCoder's untrained-encoder control doing identical embed+score work)"
+  },
+  "influcoder": {
+    "task": "Toxicity/Bias",
+    "wall_s": 424.0210504869465,
+    "auprc": 0.6233330113619031,
+    "gpu": "NVIDIA A40 (abacus25-4.rennes.grid5000.fr)",
+    "setup_s": 471.99402549210936,
+    "setup_note": "one-time cost (get_dataset + pool building + teacher-grad extraction + encoder load + distillation), NOT included in wall_s"
+  }
+}

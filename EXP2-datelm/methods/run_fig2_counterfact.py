@@ -124,6 +124,17 @@ REPSIM_BATCH_SIZE = 1
 # BM25: pure lexical, no model/GPU needed at all.
 BM25_STOPWORDS = "en"
 
+# Per-method meaning of setup_s. Both InfluCoder and Semantic report an
+# inference-only wall_s with a separately-measured setup_s, so their wall_s
+# values bracket the identical embed+score region and are directly comparable;
+# what each pays up front differs, hence the differing notes.
+SETUP_NOTES = {
+    "influcoder": "one-time cost (get_dataset + pool building + teacher-grad extraction + encoder load + distillation), NOT included in wall_s",
+    "repsim": "checkpoint load + get_dataset + dataset construction, NOT included in wall_s -- same convention as InfluCoder/Semantic so all three wall_s values bracket compute only",
+    "semantic": "get_dataset + encoder load, NOT included in wall_s -- excluded to match InfluCoder's inference-only wall_s convention (Semantic is InfluCoder's untrained-encoder control doing identical embed+score work)",
+}
+
+
 # InfluCoder: BEST known config, found via the hard_ratio + encoder-size sweep
 # in EXP2.md -- ettin-400m, moredata scale, hard_ratio=0.25
 # (Recall@50=0.4689, MRR=0.8739 the first time this exact config was measured;
@@ -257,7 +268,7 @@ def run_repsim():
             reps.append(batch_reps.float().cpu())
         return normalize(torch.cat(reps), dim=1)
 
-    t0 = time.perf_counter()
+    t_setup0 = time.perf_counter()
     tokenizer, model = checkpoints_load_func(None, CHECKPOINT, BASE_MODEL)
     model.eval()
 
@@ -270,18 +281,29 @@ def run_repsim():
     ref_ds = MessageDatasetRepSim(ref_chat, tokenizer=tokenizer, max_length=MAX_LEN)
     train_loader = DataLoader(train_ds, batch_size=REPSIM_BATCH_SIZE, shuffle=False, collate_fn=collate)
     ref_loader = DataLoader(ref_ds, batch_size=REPSIM_BATCH_SIZE, shuffle=False, collate_fn=collate)
+    setup_s = time.perf_counter() - t_setup0
+
+    # Same two-phase convention as run_semantic()/run_influcoder(): setup_s is
+    # checkpoint load + get_dataset + dataset/loader construction; wall_s is the
+    # forward passes + scoring only. Tokenization stays inside wall_s (it happens
+    # lazily during DataLoader iteration), matching Semantic, where
+    # sentence-transformers tokenizes inside embed(). NOTE the dattri-backed
+    # methods CANNOT be split this way -- they load the checkpoint inside
+    # upstream's attribute(), which we keep byte-identical -- so their wall_s
+    # still carries a ~5s load. Negligible at their 340-11000s scale.
+    t_inf0 = time.perf_counter()
 
     train_reps = collect_reps(train_loader, model, desc="repsim train reps")
     ref_reps = collect_reps(ref_loader, model, desc="repsim ref reps")
     sim = train_reps @ ref_reps.T  # [n_train, n_ref]
-    wall_s = time.perf_counter() - t0
+    wall_s = time.perf_counter() - t_inf0
 
     save_path = RESULTS_DIR / "fig2-counterfact-repsim" / "Rep_Sim.pt"
     save_path.parent.mkdir(parents=True, exist_ok=True)
     with open(save_path, "w") as f:
         json.dump(sim.T.tolist(), f)  # [n_ref, n_train], matches dattri's convention
 
-    return wall_s, None, save_path
+    return wall_s, setup_s, save_path
 
 
 # ============================================================================
@@ -402,9 +424,19 @@ def run_influcoder():
         pred = embed(enc, anchor_texts) @ embed(enc, eval_pool_texts).T
         return spearman_metrics(pred, gt_eval)
 
+    # restore_best=False: train a FIXED number of epochs and keep the final
+    # weights. Best-epoch restoration (distill's default) argmaxes over a noisy
+    # eval metric, so a hair of bf16/GPU floating-point difference flips WHICH
+    # epoch wins -- a discrete jump to an entirely different weight set, not a
+    # small perturbation. Measured directly: two back-to-back runs of the same
+    # config, same seed, same GPU, same cached teacher gradients differed by
+    # 0.077 AUPRC (0.4961 vs 0.4188), and the unseeded torch.randperm was ruled
+    # out as the cause (the pair ran at hard_ratio=0.0, where randperm is never
+    # reached). Fixing the epoch removes the selection step entirely.
     distill(enc, anchor_texts, pool_texts, targets, epochs=INFLUCODER_EPOCHS,
            hard_ratio=INFLUCODER_HARD_RATIO, lr=INFLUCODER_LR, seed=SEED,
-           epoch_eval=epoch_eval, select_best_on=INFLUCODER_SELECT_BEST_ON)
+           epoch_eval=epoch_eval, select_best_on=INFLUCODER_SELECT_BEST_ON,
+           restore_best=False)
 
     setup_s = time.perf_counter() - t_setup0
 
@@ -437,21 +469,32 @@ def run_semantic():
     from methods.influcoder import _bootstrap  # noqa: F401 -- sys.path side effect, must run first
     from influcoder.encoder import embed, load_encoder
 
-    t0 = time.perf_counter()
+    # Timed in two phases mirroring run_influcoder() exactly: setup_s covers
+    # get_dataset()+load_encoder(), wall_s covers ONLY embed+score. Semantic is
+    # InfluCoder's ablation control -- same encoder architecture, same texts,
+    # same embed+matmul, only the weights differ (distilled vs off-the-shelf) --
+    # so the two wall_s numbers are comparable only if the timer brackets the
+    # identical region. wall_s previously also swallowed get_dataset()+
+    # load_encoder(), which InfluCoder's inference timer excludes; on this task
+    # that load is ~10s against a ~4.5s inference, so it dominated the number
+    # and made an identical-cost encoder look 3x slower than InfluCoder.
+    t_setup0 = time.perf_counter()
     local_train, local_ref = get_dataset(TASK, SUBSET)
     enc = load_encoder(INFLUCODER_ENCODER_MODEL, max_seq_len=INFLUCODER_ENCODER_MAX_LEN)
+    setup_s = time.perf_counter() - t_setup0
 
+    t_inf0 = time.perf_counter()
     all_train_emb = embed(enc, [example_text(d) for d in local_train])
     all_ref_emb = embed(enc, [example_text(d) for d in local_ref])
     scores = all_train_emb @ all_ref_emb.T
-    wall_s = time.perf_counter() - t0
+    wall_s = time.perf_counter() - t_inf0
 
     save_path = RESULTS_DIR / "fig2-counterfact-semantic" / "Semantic.pt"
     save_path.parent.mkdir(parents=True, exist_ok=True)
     with open(save_path, "w") as f:
         json.dump(scores.T.tolist(), f)
 
-    return wall_s, None, save_path
+    return wall_s, setup_s, save_path
 
 
 # ============================================================================
@@ -492,7 +535,7 @@ def main():
     }
     if setup_s is not None:
         record["setup_s"] = setup_s
-        record["setup_note"] = "one-time cost (teacher-grad extraction + distillation), NOT included in wall_s"
+        record["setup_note"] = SETUP_NOTES[args.method]
 
     save_summary(args.method, record)
 

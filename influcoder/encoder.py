@@ -27,10 +27,36 @@ def load_encoder(name: str, device: str = "cuda", max_seq_len: int = 512):
 
 
 def embed(enc, texts: list[str], batch_size: int = 32) -> np.ndarray:
+    """Embed under the same bf16 autocast `distill` trains with.
+
+    Previously this ran in fp32 while training ran bf16 -- load_encoder does
+    `_, attn = hardware_profile(device)`, discarding the dtype, so inference
+    never used the tensor cores training already relied on. On Ampere+ that is
+    ~37 vs ~150 TFLOPS.
+
+    Autocast rather than loading the weights in bf16: `distill` optimizes these
+    same parameters with AdamW, and bf16 master weights degrade optimizer
+    updates. Autocast keeps fp32 weights while still running the matmuls in
+    bf16, so inference gets the speedup and training precision is untouched.
+
+    convert_to_tensor + explicit .float() because numpy has no bfloat16 dtype,
+    so convert_to_numpy=True would fail on the bf16 embeddings.
+
+    batch_size stays at 32: measured on a 1000-text A40 subsample (median
+    ~347 words/text, up to max_seq_len tokens), bf16 alone at batch=32 gave
+    3.37x throughput; batch=128/256 were SLOWER (3.18x/2.95x) -- this
+    workload is compute-bound on the matmuls, not batch-launch-overhead-
+    bound, so a bigger batch only adds per-step padding waste without
+    hiding any fixed cost. Don't raise this without re-benchmarking.
+    """
     enc.eval()
-    with torch.inference_mode():
-        return enc.encode(texts, batch_size=batch_size, normalize_embeddings=True,
-                          convert_to_numpy=True, show_progress_bar=False)
+    device = enc.device.type if hasattr(enc.device, "type") else "cuda"
+    amp_dtype, _ = hardware_profile(device)
+    with torch.inference_mode(), torch.autocast(device, dtype=amp_dtype,
+                                                enabled=amp_dtype != torch.float32):
+        emb = enc.encode(texts, batch_size=batch_size, normalize_embeddings=True,
+                         convert_to_tensor=True, show_progress_bar=False)
+    return emb.float().cpu().numpy()
 
 
 def pearson_kl_loss(scores: torch.Tensor, labels: torch.Tensor,

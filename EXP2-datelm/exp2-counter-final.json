@@ -15,22 +15,6 @@
     "setup_s": 7.771686761174351,
     "setup_note": "checkpoint load + get_dataset + dataset construction, NOT included in wall_s -- same convention as InfluCoder/Semantic so all three wall_s values bracket compute only"
   },
-  "influcoder": {
-    "task": "Counterfact",
-    "wall_s": 6.347848967881873,
-    "recall_at_50": 0.46553374295525035,
-    "mrr": 0.8156986531986532,
-    "gpu": "NVIDIA A40 (abacus25-4.rennes.grid5000.fr)",
-    "setup_s": 484.5350846420042,
-    "setup_note": "one-time cost (get_dataset + pool building + teacher-grad extraction + encoder load + distillation), NOT included in wall_s"
-  },
-  "graddot": {
-    "task": "Counterfact",
-    "wall_s": 343.35495605701,
-    "recall_at_50": 0.4667110968699816,
-    "mrr": 0.7681801496394798,
-    "gpu": "NVIDIA RTX 6000 Ada Generation (vercors14-4.grenoble.grid5000.fr)"
-  },
   "gradsim": {
     "task": "Counterfact",
     "wall_s": 859.3596468209944,
@@ -38,18 +22,18 @@
     "mrr": 0.8359848484848484,
     "gpu": "NVIDIA RTX A5000 (vercors9-7.grenoble.grid5000.fr)"
   },
-  "ekfac": {
-    "task": "Counterfact",
-    "wall_s": 1091.4357662039984,
-    "recall_at_50": 0.4640682269287134,
-    "mrr": 0.768704527795437,
-    "gpu": "NVIDIA RTX 6000 Ada Generation (vercors14-4.grenoble.grid5000.fr)"
-  },
   "less": {
     "task": "Counterfact",
     "wall_s": 1642.4957082879992,
     "recall_at_50": 0.4936626475188329,
     "mrr": 0.7793183940242764,
+    "gpu": "NVIDIA RTX 6000 Ada Generation (vercors14-4.grenoble.grid5000.fr)"
+  },
+  "datainf": {
+    "task": "Counterfact",
+    "wall_s": 3616.1848039210017,
+    "recall_at_50": 0.4721622924370502,
+    "mrr": 0.7649443990353082,
     "gpu": "NVIDIA RTX 6000 Ada Generation (vercors14-4.grenoble.grid5000.fr)"
   },
   "semantic": {
@@ -61,11 +45,13 @@
     "setup_s": 13.414740145904943,
     "setup_note": "get_dataset + encoder load, NOT included in wall_s -- excluded to match InfluCoder's inference-only wall_s convention (Semantic is InfluCoder's untrained-encoder control doing identical embed+score work)"
   },
-  "datainf": {
+  "influcoder": {
     "task": "Counterfact",
-    "wall_s": 3616.1848039210017,
-    "recall_at_50": 0.4721622924370502,
-    "mrr": 0.7649443990353082,
-    "gpu": "NVIDIA RTX 6000 Ada Generation (vercors14-4.grenoble.grid5000.fr)"
+    "wall_s": 6.347848967881873,
+    "recall_at_50": 0.46553374295525035,
+    "mrr": 0.8156986531986532,
+    "gpu": "NVIDIA A40 (abacus25-4.rennes.grid5000.fr)",
+    "setup_s": 484.5350846420042,
+    "setup_note": "one-time cost (get_dataset + pool building + teacher-grad extraction + encoder load + distillation), NOT included in wall_s"
   }
 }

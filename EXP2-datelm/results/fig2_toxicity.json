@@ -1,15 +1,17 @@
 {
   "bm25": {
     "task": "Toxicity/Bias",
-    "wall_s": 4.198503382009221,
+    "wall_s": 5.306041954085231,
     "auprc": 0.2915908711953049,
-    "gpu": "NVIDIA RTX 6000 Ada Generation (vercors14-4.grenoble.grid5000.fr)"
+    "gpu": "NVIDIA A40 (abacus25-4.rennes.grid5000.fr)"
   },
   "repsim": {
     "task": "Toxicity/Bias",
-    "wall_s": 158.50717017101124,
-    "auprc": 0.40476271521649765,
-    "gpu": "NVIDIA RTX 6000 Ada Generation (vercors14-4.grenoble.grid5000.fr)"
+    "wall_s": 229.7403108200524,
+    "auprc": 0.4037853219079475,
+    "gpu": "NVIDIA A40 (abacus25-4.rennes.grid5000.fr)",
+    "setup_s": 7.833872759947553,
+    "setup_note": "checkpoint load + get_dataset + dataset construction, NOT included in wall_s -- same convention as InfluCoder/Semantic so all three wall_s values bracket compute only"
   },
   "graddot": {
     "task": "Toxicity/Bias",
@@ -25,17 +27,19 @@
   },
   "influcoder": {
     "task": "Toxicity/Bias",
-    "wall_s": 302.80913291999605,
-    "auprc": 0.7369535672778011,
-    "gpu": "NVIDIA RTX 6000 Ada Generation (vercors14-4.grenoble.grid5000.fr)",
-    "setup_s": 301.2152206239989,
-    "setup_note": "one-time cost (teacher-grad extraction + distillation), NOT included in wall_s"
+    "wall_s": 425.16533530596644,
+    "auprc": 0.6023123652692388,
+    "gpu": "NVIDIA A40 (abacus25-4.rennes.grid5000.fr)",
+    "setup_s": 481.14242836111225,
+    "setup_note": "one-time cost (get_dataset + pool building + teacher-grad extraction + encoder load + distillation), NOT included in wall_s"
   },
   "semantic": {
     "task": "Toxicity/Bias",
-    "wall_s": 312.2600634209957,
-    "auprc": 0.5442856385463196,
-    "gpu": "NVIDIA RTX 6000 Ada Generation (vercors14-4.grenoble.grid5000.fr)"
+    "wall_s": 422.4143894710578,
+    "auprc": 0.544277877033905,
+    "gpu": "NVIDIA A40 (abacus25-4.rennes.grid5000.fr)",
+    "setup_s": 12.924674456939101,
+    "setup_note": "get_dataset + encoder load, NOT included in wall_s -- excluded to match InfluCoder's inference-only wall_s convention (Semantic is InfluCoder's untrained-encoder control doing identical embed+score work)"
   },
   "less": {
     "task": "Toxicity/Bias",
