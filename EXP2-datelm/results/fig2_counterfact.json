@@ -1,0 +1,67 @@
+{
+  "bm25": {
+    "task": "Counterfact",
+    "wall_s": 0.06694878501002677,
+    "recall_at_50": 0.34842388268073204,
+    "mrr": 0.5594071122480213,
+    "gpu": "NVIDIA RTX 6000 Ada Generation (vercors14-4.grenoble.grid5000.fr)"
+  },
+  "repsim": {
+    "task": "Counterfact",
+    "wall_s": 50.530023595987586,
+    "recall_at_50": 0.3757834710788605,
+    "mrr": 0.7887075887075887,
+    "gpu": "NVIDIA RTX 6000 Ada Generation (vercors14-4.grenoble.grid5000.fr)"
+  },
+  "influcoder": {
+    "task": "Counterfact",
+    "wall_s": 4.497890664002625,
+    "recall_at_50": 0.4490962281458967,
+    "mrr": 0.8321133412042503,
+    "gpu": "NVIDIA RTX 6000 Ada Generation (vercors14-4.grenoble.grid5000.fr)",
+    "setup_s": 208.07462564499292,
+    "setup_note": "one-time cost (teacher-grad extraction + distillation), NOT included in wall_s"
+  },
+  "graddot": {
+    "task": "Counterfact",
+    "wall_s": 343.35495605701,
+    "recall_at_50": 0.4667110968699816,
+    "mrr": 0.7681801496394798,
+    "gpu": "NVIDIA RTX 6000 Ada Generation (vercors14-4.grenoble.grid5000.fr)"
+  },
+  "gradsim": {
+    "task": "Counterfact",
+    "wall_s": 378.35108452598797,
+    "recall_at_50": 0.49249542830603726,
+    "mrr": 0.8359848484848484,
+    "gpu": "NVIDIA RTX 6000 Ada Generation (vercors14-4.grenoble.grid5000.fr)"
+  },
+  "ekfac": {
+    "task": "Counterfact",
+    "wall_s": 1091.4357662039984,
+    "recall_at_50": 0.4640682269287134,
+    "mrr": 0.768704527795437,
+    "gpu": "NVIDIA RTX 6000 Ada Generation (vercors14-4.grenoble.grid5000.fr)"
+  },
+  "less": {
+    "task": "Counterfact",
+    "wall_s": 1642.4957082879992,
+    "recall_at_50": 0.4936626475188329,
+    "mrr": 0.7793183940242764,
+    "gpu": "NVIDIA RTX 6000 Ada Generation (vercors14-4.grenoble.grid5000.fr)"
+  },
+  "semantic": {
+    "task": "Counterfact",
+    "wall_s": 14.611693654995179,
+    "recall_at_50": 0.27750338813836467,
+    "mrr": 0.7543790656758572,
+    "gpu": "NVIDIA RTX 6000 Ada Generation (vercors14-4.grenoble.grid5000.fr)"
+  },
+  "datainf": {
+    "task": "Counterfact",
+    "wall_s": 3616.1848039210017,
+    "recall_at_50": 0.4721622924370502,
+    "mrr": 0.7649443990353082,
+    "gpu": "NVIDIA RTX 6000 Ada Generation (vercors14-4.grenoble.grid5000.fr)"
+  }
+}
