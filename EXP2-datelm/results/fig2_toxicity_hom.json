@@ -9,15 +9,15 @@
   },
   "bm25": {
     "task": "Toxicity/Bias",
-    "wall_s": 4.222198925999692,
+    "wall_s": 5.834839482000461,
     "auprc": 0.29507158194194516,
-    "gpu": "NVIDIA RTX 6000 Ada Generation (vercors14-4.grenoble.grid5000.fr)"
+    "gpu": "NVIDIA RTX A5000 (vercors9-1.grenoble.grid5000.fr)"
   },
   "repsim": {
     "task": "Toxicity/Bias",
-    "wall_s": 160.9595416749944,
-    "auprc": 0.4239061490617613,
-    "gpu": "NVIDIA RTX 6000 Ada Generation (vercors14-4.grenoble.grid5000.fr)"
+    "wall_s": 308.90985521699986,
+    "auprc": 0.4247208989943925,
+    "gpu": "NVIDIA RTX A5000 (vercors9-1.grenoble.grid5000.fr)"
   },
   "graddot": {
     "task": "Toxicity/Bias",
@@ -36,5 +36,11 @@
     "wall_s": 1280.9478828339998,
     "auprc": 0.688629459175576,
     "gpu": "NVIDIA RTX A5000 (vercors10-1.grenoble.grid5000.fr)"
+  },
+  "less": {
+    "task": "Toxicity/Bias",
+    "wall_s": 4199.353609860998,
+    "auprc": 0.7318079537874367,
+    "gpu": "NVIDIA RTX A5000 (vercors9-5.grenoble.grid5000.fr)"
   }
 }
