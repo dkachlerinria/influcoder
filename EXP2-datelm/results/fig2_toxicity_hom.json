@@ -42,5 +42,11 @@
     "wall_s": 4199.353609860998,
     "auprc": 0.7318079537874367,
     "gpu": "NVIDIA RTX A5000 (vercors9-5.grenoble.grid5000.fr)"
+  },
+  "datainf": {
+    "task": "Toxicity/Bias",
+    "wall_s": 5079.390107776038,
+    "auprc": 0.17639480204433264,
+    "gpu": "NVIDIA A40 (abacus25-4.rennes.grid5000.fr)"
   }
 }
