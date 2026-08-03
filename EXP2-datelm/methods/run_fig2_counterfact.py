@@ -189,11 +189,17 @@ def save_summary(method_key: str, record: dict):
 def run_bm25():
     import bm25s
 
+    # get_dataset() timed IN, matching Rep-Sim/dattri-backed methods (dattri's
+    # own attribute() calls get_dataset() internally as its first step) --
+    # keeps wall_s meaning the same thing across every method here. Previously
+    # excluded, giving BM25/InfluCoder/semantic a small unearned head start;
+    # found during a fairness review, fixed going forward (not retroactively
+    # applied to already-completed runs).
+    t0 = time.perf_counter()
     local_train, local_ref = get_dataset(TASK, SUBSET)
     train_texts = [example_text(d) for d in local_train]
     ref_texts = [example_text(d) for d in local_ref]
 
-    t0 = time.perf_counter()
     train_tokens = bm25s.tokenize(train_texts, stopwords=BM25_STOPWORDS)
     retriever = bm25s.BM25()
     retriever.index(train_tokens)
@@ -350,11 +356,14 @@ def run_influcoder():
         return pool
 
     random.seed(SEED)
-    local_train, local_ref = get_dataset(TASK, SUBSET)
-    n_train, n_ref = len(local_train), len(local_ref)
 
     # ---- SETUP: teacher gradients + distillation (measured, saved, NOT counted in wall_s) ----
+    # get_dataset() timed IN here (setup, paid once), matching the fairness
+    # fix applied to run_bm25()/run_semantic() -- previously excluded from
+    # both setup_s and wall_s entirely, an inconsistency vs. Rep-Sim/dattri.
     t_setup0 = time.perf_counter()
+    local_train, local_ref = get_dataset(TASK, SUBSET)
+    n_train, n_ref = len(local_train), len(local_ref)
 
     pool = build_clean_external_pool(local_train, local_ref)
     perm = list(range(len(pool)))
@@ -415,6 +424,36 @@ def run_influcoder():
 
 
 # ============================================================================
+# Semantic baseline -- the SAME encoder InfluCoder distills (ettin-400m), but
+# UNTRAINED (straight off the shelf, zero-shot). Isolates how much of
+# InfluCoder's result is the distillation itself vs. just having a small,
+# cheap encoder to embed with. Structurally single-phase like Rep-Sim (no
+# setup/inference split -- there's no training step to amortize, so wall_s
+# includes model loading, matching Rep-Sim's convention), NOT two-phase like
+# InfluCoder. Expect inference-comparable wall_s to InfluCoder's (same size
+# encoder, same embed+score operation) since neither does a backward pass.
+# ============================================================================
+def run_semantic():
+    from influcoder.encoder import embed, load_encoder
+
+    t0 = time.perf_counter()
+    local_train, local_ref = get_dataset(TASK, SUBSET)
+    enc = load_encoder(INFLUCODER_ENCODER_MODEL, max_seq_len=INFLUCODER_ENCODER_MAX_LEN)
+
+    all_train_emb = embed(enc, [example_text(d) for d in local_train])
+    all_ref_emb = embed(enc, [example_text(d) for d in local_ref])
+    scores = all_train_emb @ all_ref_emb.T
+    wall_s = time.perf_counter() - t0
+
+    save_path = RESULTS_DIR / "fig2-counterfact-semantic" / "Semantic.pt"
+    save_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(save_path, "w") as f:
+        json.dump(scores.T.tolist(), f)
+
+    return wall_s, None, save_path
+
+
+# ============================================================================
 DISPATCH = {
     "bm25": run_bm25,
     "repsim": run_repsim,
@@ -424,6 +463,7 @@ DISPATCH = {
     "datainf": lambda: run_dattri("datainf"),
     "ekfac": lambda: run_dattri("ekfac"),
     "influcoder": run_influcoder,
+    "semantic": run_semantic,
 }
 
 
