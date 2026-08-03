@@ -36,5 +36,23 @@
     "wall_s": 312.2600634209957,
     "auprc": 0.5442856385463196,
     "gpu": "NVIDIA RTX 6000 Ada Generation (vercors14-4.grenoble.grid5000.fr)"
+  },
+  "less": {
+    "task": "Toxicity/Bias",
+    "wall_s": 3025.3703864489944,
+    "auprc": 0.6411311724988927,
+    "gpu": "NVIDIA RTX 6000 Ada Generation (vercors14-4.grenoble.grid5000.fr)"
+  },
+  "ekfac": {
+    "task": "Toxicity/Bias",
+    "wall_s": 11007.466094447998,
+    "auprc": 0.11510450242593369,
+    "gpu": "NVIDIA RTX 6000 Ada Generation (vercors14-4.grenoble.grid5000.fr)"
+  },
+  "datainf": {
+    "task": "Toxicity/Bias",
+    "wall_s": 2373.580836721987,
+    "auprc": 0.1517123675212051,
+    "gpu": "NVIDIA RTX 6000 Ada Generation (vercors14-4.grenoble.grid5000.fr)"
   }
 }
