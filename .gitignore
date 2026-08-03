@@ -29,3 +29,9 @@ baselines/cache/
 # NOT ignored -- they're small, fixed inputs checked in for reproducibility.
 # baselines/out/ (tables, plots) is also intentionally NOT ignored -- those
 # are the actual results, not scratch.
+
+# flock sentinels created by save_summary() at runtime
+*.lock
+# cached teacher gradients (regenerable, large)
+EXP2-datelm/results/_grad_cache/
+EXP2-datelm/results_hardratio_stability/

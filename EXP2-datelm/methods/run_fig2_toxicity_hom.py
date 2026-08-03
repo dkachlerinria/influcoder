@@ -95,6 +95,10 @@ SEED = 0
 
 RESULTS_DIR = Path("results")
 SUMMARY_PATH = RESULTS_DIR / "fig2_toxicity_hom.json"
+GRAD_CACHE_DIR = RESULTS_DIR / "_grad_cache"
+
+# Populated by run_influcoder(), merged into the saved record by main().
+EXTRA_RECORD_FIELDS = {}
 
 DATTRI_METHOD_NAME = {
     "graddot": "Grad_Dot",
@@ -167,12 +171,25 @@ def evaluate(score_path: Path) -> float:
 
 
 def save_summary(method_key: str, record: dict):
+    """flock-protected read-modify-write: with several methods now running in
+    true parallel across separate GPUs and writing to this SAME summary file,
+    an unprotected read+write here would race -- two processes reading the
+    old file before either writes back loses whichever write lands first.
+    The lock covers only this tiny read/modify/write, not the (multi-minute)
+    compute that produced `record`, so parallelism is unaffected."""
+    import fcntl
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    summary = {}
-    if SUMMARY_PATH.exists():
-        summary = json.loads(SUMMARY_PATH.read_text())
-    summary[method_key] = record
-    SUMMARY_PATH.write_text(json.dumps(summary, indent=2))
+    lock_path = SUMMARY_PATH.with_suffix(".lock")
+    with open(lock_path, "w") as lockfile:
+        fcntl.flock(lockfile, fcntl.LOCK_EX)
+        try:
+            summary = {}
+            if SUMMARY_PATH.exists():
+                summary = json.loads(SUMMARY_PATH.read_text())
+            summary[method_key] = record
+            SUMMARY_PATH.write_text(json.dumps(summary, indent=2))
+        finally:
+            fcntl.flock(lockfile, fcntl.LOCK_UN)
     print(f"wrote {SUMMARY_PATH} (method={method_key})")
 
 
@@ -320,6 +337,13 @@ def run_influcoder():
     )
     from influcoder.encoder import distill, embed, load_encoder
     from influcoder.metrics import spearman_metrics
+    from methods.influcoder.grad_cache import install_grad_cache
+
+    # Teacher gradients are deterministic given the seeded pools + fixed
+    # checkpoint, so they are computed once and reused across every later run
+    # (sweeps, stability reps, re-timings). setup_s is corrected below so a
+    # cached run still reports the true from-scratch cost.
+    _grad_stats = install_grad_cache(CHECKPOINT, GRAD_CACHE_DIR)
 
     def build_wildguard_toxic_pool(local_prompts: set, n_needed: int):
         ds = load_dataset("allenai/wildguardmix", "wildguardtrain")["train"]
@@ -447,7 +471,12 @@ def run_influcoder():
            epoch_eval=epoch_eval, select_best_on=INFLUCODER_SELECT_BEST_ON,
            restore_best=False)
 
-    setup_s = time.perf_counter() - t_setup0
+    setup_s_this_run = time.perf_counter() - t_setup0
+    # Add back what the cache skipped, so setup_s always means "cost from
+    # scratch" and is comparable across cached and uncached runs.
+    setup_s = setup_s_this_run - _grad_stats["grad_s_this_run"] + _grad_stats["grad_s"]
+    EXTRA_RECORD_FIELDS["grad_collection_s"] = _grad_stats["grad_s"]
+    EXTRA_RECORD_FIELDS["setup_s_this_run"] = setup_s_this_run
 
     # ---- INFERENCE: embed+score the full local train/ref ----
     t_inf0 = time.perf_counter()
@@ -539,6 +568,7 @@ def main():
         record["setup_s"] = setup_s
         record["setup_note"] = SETUP_NOTES[args.method]
 
+    record.update(EXTRA_RECORD_FIELDS)
     save_summary(args.method, record)
 
 

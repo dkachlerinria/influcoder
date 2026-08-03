@@ -33,10 +33,10 @@
   },
   "gradsim": {
     "task": "Counterfact",
-    "wall_s": 859.3596468209944,
-    "recall_at_50": 0.4923807942025515,
+    "wall_s": 888.9552535561379,
+    "recall_at_50": 0.4926400425918573,
     "mrr": 0.8359848484848484,
-    "gpu": "NVIDIA RTX A5000 (vercors9-7.grenoble.grid5000.fr)"
+    "gpu": "NVIDIA A40 (abacus25-4.rennes.grid5000.fr)"
   },
   "ekfac": {
     "task": "Counterfact",
@@ -54,11 +54,11 @@
   },
   "semantic": {
     "task": "Counterfact",
-    "wall_s": 7.610993569949642,
-    "recall_at_50": 0.27750338813836467,
-    "mrr": 0.7543790656758572,
-    "gpu": "NVIDIA A40 (abacus25-4.rennes.grid5000.fr)",
-    "setup_s": 13.414740145904943,
+    "wall_s": 8.138582207961008,
+    "recall_at_50": 0.2791583793658491,
+    "mrr": 0.7530196927255751,
+    "gpu": "NVIDIA A40 (abacus25-1.rennes.grid5000.fr)",
+    "setup_s": 17.49033457809128,
     "setup_note": "get_dataset + encoder load, NOT included in wall_s -- excluded to match InfluCoder's inference-only wall_s convention (Semantic is InfluCoder's untrained-encoder control doing identical embed+score work)"
   },
   "datainf": {

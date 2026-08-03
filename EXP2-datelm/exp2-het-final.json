@@ -15,9 +15,9 @@
   },
   "gradsim": {
     "task": "Toxicity/Bias",
-    "wall_s": 1281.7822824239993,
-    "auprc": 0.6324480246805181,
-    "gpu": "NVIDIA RTX A5000 (vercors9-7.grenoble.grid5000.fr)"
+    "wall_s": 1493.900974550983,
+    "auprc": 0.6307063567512857,
+    "gpu": "NVIDIA A40 (abacus25-2.rennes.grid5000.fr)"
   },
   "less": {
     "task": "Toxicity/Bias",
@@ -33,10 +33,10 @@
   },
   "semantic": {
     "task": "Toxicity/Bias",
-    "wall_s": 422.4143894710578,
-    "auprc": 0.544277877033905,
-    "gpu": "NVIDIA A40 (abacus25-4.rennes.grid5000.fr)",
-    "setup_s": 12.924674456939101,
+    "wall_s": 125.73672964703292,
+    "auprc": 0.5435816876140751,
+    "gpu": "NVIDIA A40 (abacus25-1.rennes.grid5000.fr)",
+    "setup_s": 12.726884642150253,
     "setup_note": "get_dataset + encoder load, NOT included in wall_s -- excluded to match InfluCoder's inference-only wall_s convention (Semantic is InfluCoder's untrained-encoder control doing identical embed+score work)"
   },
   "influcoder": {
