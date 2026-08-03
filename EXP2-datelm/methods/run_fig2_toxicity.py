@@ -455,6 +455,7 @@ def run_influcoder():
 # full rationale -- identical here, just flat-mean-reduced for AUPRC.
 # ============================================================================
 def run_semantic():
+    from methods.influcoder import _bootstrap  # noqa: F401 -- sys.path side effect, must run first
     from influcoder.encoder import embed, load_encoder
 
     t0 = time.perf_counter()

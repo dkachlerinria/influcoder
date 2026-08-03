@@ -434,6 +434,7 @@ def run_influcoder():
 # encoder, same embed+score operation) since neither does a backward pass.
 # ============================================================================
 def run_semantic():
+    from methods.influcoder import _bootstrap  # noqa: F401 -- sys.path side effect, must run first
     from influcoder.encoder import embed, load_encoder
 
     t0 = time.perf_counter()
