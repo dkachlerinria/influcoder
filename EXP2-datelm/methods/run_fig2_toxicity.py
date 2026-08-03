@@ -438,7 +438,12 @@ def run_influcoder():
     all_train_emb = embed(enc, [example_text(d) for d in local_train])
     all_ref_emb = embed(enc, [example_text(d) for d in local_ref])
     scores = all_train_emb @ all_ref_emb.T  # [n_train, n_ref]
-    flat_scores = scores.mean(dim=1)  # [n_train]
+    # np.asarray() first: influcoder.encoder.embed() returns a numpy array
+    # here (unlike Rep-Sim's raw HF forward pass, which is a torch tensor),
+    # so a bare .mean(dim=1) crashes (numpy has no `dim` kwarg) -- found via
+    # a real crash on the first toxicity run, after ~10.5 min of otherwise-
+    # successful setup work wasted at the very last step.
+    flat_scores = np.asarray(scores).mean(axis=1)  # [n_train]
     inference_s = time.perf_counter() - t_inf0
 
     save_path = RESULTS_DIR / "fig2-toxicity-influcoder" / "InfluCoder.pt"
@@ -465,7 +470,7 @@ def run_semantic():
     all_train_emb = embed(enc, [example_text(d) for d in local_train])
     all_ref_emb = embed(enc, [example_text(d) for d in local_ref])
     scores = all_train_emb @ all_ref_emb.T
-    flat_scores = scores.mean(dim=1)
+    flat_scores = np.asarray(scores).mean(axis=1)  # see run_influcoder()'s note on why np.asarray() first
     wall_s = time.perf_counter() - t0
 
     save_path = RESULTS_DIR / "fig2-toxicity-semantic" / "Semantic.pt"
