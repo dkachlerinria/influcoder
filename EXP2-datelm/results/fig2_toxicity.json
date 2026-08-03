@@ -1,0 +1,40 @@
+{
+  "bm25": {
+    "task": "Toxicity/Bias",
+    "wall_s": 4.198503382009221,
+    "auprc": 0.2915908711953049,
+    "gpu": "NVIDIA RTX 6000 Ada Generation (vercors14-4.grenoble.grid5000.fr)"
+  },
+  "repsim": {
+    "task": "Toxicity/Bias",
+    "wall_s": 158.50717017101124,
+    "auprc": 0.40476271521649765,
+    "gpu": "NVIDIA RTX 6000 Ada Generation (vercors14-4.grenoble.grid5000.fr)"
+  },
+  "graddot": {
+    "task": "Toxicity/Bias",
+    "wall_s": 570.4971260599996,
+    "auprc": 0.1480364648435748,
+    "gpu": "NVIDIA RTX 6000 Ada Generation (vercors14-4.grenoble.grid5000.fr)"
+  },
+  "gradsim": {
+    "task": "Toxicity/Bias",
+    "wall_s": 570.7912480689993,
+    "auprc": 0.6307681909595015,
+    "gpu": "NVIDIA RTX 6000 Ada Generation (vercors14-4.grenoble.grid5000.fr)"
+  },
+  "influcoder": {
+    "task": "Toxicity/Bias",
+    "wall_s": 302.80913291999605,
+    "auprc": 0.7369535672778011,
+    "gpu": "NVIDIA RTX 6000 Ada Generation (vercors14-4.grenoble.grid5000.fr)",
+    "setup_s": 301.2152206239989,
+    "setup_note": "one-time cost (teacher-grad extraction + distillation), NOT included in wall_s"
+  },
+  "semantic": {
+    "task": "Toxicity/Bias",
+    "wall_s": 312.2600634209957,
+    "auprc": 0.5442856385463196,
+    "gpu": "NVIDIA RTX 6000 Ada Generation (vercors14-4.grenoble.grid5000.fr)"
+  }
+}
