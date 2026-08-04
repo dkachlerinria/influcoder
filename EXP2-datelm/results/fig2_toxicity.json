@@ -48,8 +48,8 @@
   },
   "less": {
     "task": "Toxicity/Bias",
-    "wall_s": 4801.355263819918,
-    "auprc": 0.6591757657757344,
+    "wall_s": 4850.719914508052,
+    "auprc": 0.6597014563309798,
     "gpu": "NVIDIA A40 (abacus25-4.rennes.grid5000.fr)"
   },
   "ekfac": {

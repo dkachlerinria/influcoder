@@ -68,9 +68,9 @@
   },
   "datainf": {
     "task": "Counterfact",
-    "wall_s": 6438.723440231988,
+    "wall_s": 6501.360277530039,
     "recall_at_50": 0.4718592621340199,
     "mrr": 0.7653051493960585,
-    "gpu": "NVIDIA A40 (abacus25-3.rennes.grid5000.fr)"
+    "gpu": "NVIDIA A40 (abacus25-4.rennes.grid5000.fr)"
   }
 }

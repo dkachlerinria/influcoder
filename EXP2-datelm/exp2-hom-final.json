@@ -21,9 +21,9 @@
   },
   "less": {
     "task": "Toxicity/Bias",
-    "wall_s": 4726.480469967006,
-    "auprc": 0.7584443743755764,
-    "gpu": "NVIDIA A40 (abacus25-3.rennes.grid5000.fr)"
+    "wall_s": 4688.119993833825,
+    "auprc": 0.7584430082378588,
+    "gpu": "NVIDIA A40 (abacus25-4.rennes.grid5000.fr)"
   },
   "datainf": {
     "task": "Toxicity/Bias",
