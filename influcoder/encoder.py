@@ -259,8 +259,15 @@ def distill(enc, anchor_texts: list[str], pool_texts: list[str],
     # final embed() of the local train/ref set (which happens after distill
     # returns) keeps the fast kernel and all reported inference timings are
     # unaffected.
-    _attn_ctx = (sdpa_kernel(SDPBackend.MATH) if sdpa_kernel is not None
-                 else contextlib.nullcontext())
+    # NOTE: forcing SDPBackend.MATH here WOULD be deterministic, but it
+    # materializes the full seq x seq attention matrix. Measured: OOM on a 44GB
+    # A40 at max_seq_len=1024 with a 24-sequence block (~40GB of attention
+    # matrices across layers), killing every run. Memory-efficient attention
+    # exists precisely to avoid that O(n^2) allocation, so determinism via MATH
+    # is not affordable at this sequence length -- it would need a much smaller
+    # k_anchors/m_candidates block, which changes the training config itself.
+    # Left non-deterministic on purpose; report mean +/- std over seeds instead.
+    _attn_ctx = contextlib.nullcontext()
     with _attn_ctx:
       for epoch in range(epochs):
           if hard_ratio_end is not None and epochs > 1:
