@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import contextlib
 import math
+import os
 import random
 
 import numpy as np
@@ -141,12 +142,6 @@ def _seed_torch(seed: int) -> None:
     torch.manual_seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-    try:
-        torch.use_deterministic_algorithms(True, warn_only=True)
-    except Exception as e:  # older torch, or backend refuses
-        print(f"  [determinism] use_deterministic_algorithms unavailable: {e}")
 
 
 def _sample_candidates(rng, targets_row_block: torch.Tensor, n_pool: int,
@@ -246,75 +241,57 @@ def distill(enc, anchor_texts: list[str], pool_texts: list[str],
     best_score, best_epoch, best_state = -float("inf"), -1, None
     enc.train()
 
-    # Force the MATH SDPA backend for TRAINING only. SDPA otherwise picks the
-    # memory-efficient/flash kernel, whose BACKWARD is non-deterministic by
-    # design -- torch warns "Memory Efficient attention defaults to a
-    # non-deterministic algorithm", and use_deterministic_algorithms(warn_only=
-    # True) lets it through rather than erroring. Seeding cannot fix that: it is
-    # non-determinism in the kernel, not in an RNG. Over 8 epochs it compounds
-    # into large swings -- identical-config Het reruns measured 0.7265 vs 0.6514
-    # (spread 0.075) WITH full seeding + cudnn.deterministic + CUBLAS_WORKSPACE_CONFIG.
-    #
-    # MATH is slower but deterministic. Scoped to the training loop only, so the
-    # final embed() of the local train/ref set (which happens after distill
-    # returns) keeps the fast kernel and all reported inference timings are
-    # unaffected.
-    # NOTE: forcing SDPBackend.MATH here WOULD be deterministic, but it
-    # materializes the full seq x seq attention matrix. Measured: OOM on a 44GB
-    # A40 at max_seq_len=1024 with a 24-sequence block (~40GB of attention
-    # matrices across layers), killing every run. Memory-efficient attention
-    # exists precisely to avoid that O(n^2) allocation, so determinism via MATH
-    # is not affordable at this sequence length -- it would need a much smaller
-    # k_anchors/m_candidates block, which changes the training config itself.
-    # Left non-deterministic on purpose; report mean +/- std over seeds instead.
-    _attn_ctx = contextlib.nullcontext()
-    with _attn_ctx:
-      for epoch in range(epochs):
-          if hard_ratio_end is not None and epochs > 1:
-              cur_hard_ratio = hard_ratio + (hard_ratio_end - hard_ratio) * epoch / (epochs - 1)
-          else:
-              cur_hard_ratio = hard_ratio
-          order = list(range(len(anchor_texts)))
-          rng.shuffle(order)
-          losses = []
-          starts = list(range(0, len(order), k_anchors))
-          for b, i in enumerate(starts):
-              a_idx = torch.tensor(order[i:i + k_anchors])
-              c_idx = _sample_candidates(rng, targets[a_idx], len(pool_texts),
-                                         m_candidates, cur_hard_ratio)
-              a_feats = tokenize([anchor_texts[j] for j in a_idx])
-              c_feats = tokenize([pool_texts[j] for j in c_idx])
-              with torch.amp.autocast(device, dtype=autocast_dtype):
-                  za = F.normalize(enc(a_feats)["sentence_embedding"], dim=1)
-                  zc = F.normalize(enc(c_feats)["sentence_embedding"], dim=1)
-                  loss = pearson_kl_loss(za @ zc.T, targets[a_idx][:, c_idx].to(device),
-                                         alpha=alpha, temperature=temperature)
-              # Scale so the accumulated gradient is the MEAN over the group, not
-              # the sum -- otherwise accumulation silently multiplies the LR.
-              scaler.scale(loss / grad_accum_steps).backward()
-              losses.append(loss.item())
-              # Step on a full group, and on the last block of the epoch so a
-              # trailing partial group is not dropped.
-              if (b + 1) % grad_accum_steps == 0 or (b + 1) == len(starts):
-                  scaler.unscale_(opt)
-                  torch.nn.utils.clip_grad_norm_(enc.parameters(), max_grad_norm)
-                  scaler.step(opt)
-                  scaler.update()
-                  opt.zero_grad(set_to_none=True)
-                  sched.step()
-          epoch_losses.append(float(np.mean(losses)))
-          msg = f"  epoch {epoch + 1}/{epochs}  loss={epoch_losses[-1]:.4f}"
-          if epoch_eval is not None:
-              m = epoch_eval()
-              epoch_metrics.append(m)
-              msg += (f"  eval per-anchor rho={m['per_anchor_mean']:+.4f}"
-                      f"  agg rho={m['aggregated']:+.4f}")
-              if m[select_best_on] > best_score:
-                  best_score, best_epoch = m[select_best_on], epoch
-                  best_state = {k: v.detach().cpu().clone() for k, v in enc.state_dict().items()}
-                  msg += "  *"
-              enc.train()
-          print(msg)
+    # Training attention stays on the default (memory-efficient) SDPA kernel.
+    # Its backward is non-deterministic, so identical-config runs vary (~0.075
+    # AUPRC on Het) -- forcing the deterministic MATH backend was tried and
+    # OOMs at seq_len=1024 regardless of encoder size, since the seq x seq
+    # attention matrices dominate, not the weights.
+    for epoch in range(epochs):
+        if hard_ratio_end is not None and epochs > 1:
+            cur_hard_ratio = hard_ratio + (hard_ratio_end - hard_ratio) * epoch / (epochs - 1)
+        else:
+            cur_hard_ratio = hard_ratio
+        order = list(range(len(anchor_texts)))
+        rng.shuffle(order)
+        losses = []
+        starts = list(range(0, len(order), k_anchors))
+        for b, i in enumerate(starts):
+            a_idx = torch.tensor(order[i:i + k_anchors])
+            c_idx = _sample_candidates(rng, targets[a_idx], len(pool_texts),
+                                       m_candidates, cur_hard_ratio)
+            a_feats = tokenize([anchor_texts[j] for j in a_idx])
+            c_feats = tokenize([pool_texts[j] for j in c_idx])
+            with torch.amp.autocast(device, dtype=autocast_dtype):
+                za = F.normalize(enc(a_feats)["sentence_embedding"], dim=1)
+                zc = F.normalize(enc(c_feats)["sentence_embedding"], dim=1)
+                loss = pearson_kl_loss(za @ zc.T, targets[a_idx][:, c_idx].to(device),
+                                       alpha=alpha, temperature=temperature)
+            # Scale so the accumulated gradient is the MEAN over the group, not
+            # the sum -- otherwise accumulation silently multiplies the LR.
+            scaler.scale(loss / grad_accum_steps).backward()
+            losses.append(loss.item())
+            # Step on a full group, and on the last block of the epoch so a
+            # trailing partial group is not dropped.
+            if (b + 1) % grad_accum_steps == 0 or (b + 1) == len(starts):
+                scaler.unscale_(opt)
+                torch.nn.utils.clip_grad_norm_(enc.parameters(), max_grad_norm)
+                scaler.step(opt)
+                scaler.update()
+                opt.zero_grad(set_to_none=True)
+                sched.step()
+        epoch_losses.append(float(np.mean(losses)))
+        msg = f"  epoch {epoch + 1}/{epochs}  loss={epoch_losses[-1]:.4f}"
+        if epoch_eval is not None:
+            m = epoch_eval()
+            epoch_metrics.append(m)
+            msg += (f"  eval per-anchor rho={m['per_anchor_mean']:+.4f}"
+                    f"  agg rho={m['aggregated']:+.4f}")
+            if m[select_best_on] > best_score:
+                best_score, best_epoch = m[select_best_on], epoch
+                best_state = {k: v.detach().cpu().clone() for k, v in enc.state_dict().items()}
+                msg += "  *"
+            enc.train()
+        print(msg)
 
     if best_state is not None and restore_best:
         enc.load_state_dict(best_state)

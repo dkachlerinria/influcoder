@@ -34,6 +34,7 @@ def main():
     ap.add_argument("--lr", type=float, default=None)
     ap.add_argument("--hard-ratio", type=float, default=None)
     ap.add_argument("--tag", required=True, help="short label for this config")
+    ap.add_argument("--encoder", type=str, default=None)
     ap.add_argument("--rep", type=int, default=1)
     args = ap.parse_args()
 
@@ -53,9 +54,11 @@ def main():
         mod.INFLUCODER_LR = args.lr
     if args.hard_ratio is not None:
         mod.INFLUCODER_HARD_RATIO = args.hard_ratio
+    if args.encoder is not None:
+        mod.INFLUCODER_ENCODER_MODEL = args.encoder
 
     print(f"=== sweep {key}: epochs={mod.INFLUCODER_EPOCHS} lr={mod.INFLUCODER_LR} "
-          f"hard_ratio={mod.INFLUCODER_HARD_RATIO} ===")
+          f"hard_ratio={mod.INFLUCODER_HARD_RATIO} enc={mod.INFLUCODER_ENCODER_MODEL} ===")
 
     t0 = time.perf_counter()
     wall_s, setup_s, score_path = mod.run_influcoder()
@@ -68,6 +71,7 @@ def main():
         "task": args.task, "tag": args.tag, "rep": args.rep,
         "epochs": mod.INFLUCODER_EPOCHS, "lr": mod.INFLUCODER_LR,
         "hard_ratio": mod.INFLUCODER_HARD_RATIO,
+        "encoder": mod.INFLUCODER_ENCODER_MODEL,
         "wall_s": wall_s, "setup_s": setup_s, "total_s": total_s,
         "gpu": mod.detect_gpu_label(),
     })
