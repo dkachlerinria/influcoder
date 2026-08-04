@@ -27,13 +27,16 @@
   },
   "influcoder": {
     "task": "Toxicity/Bias",
-    "wall_s": 127.00790680199862,
-    "auprc": 0.5365311054086572,
-    "gpu": "NVIDIA A40 (abacus25-3.rennes.grid5000.fr)",
-    "setup_s": 356.4933637420181,
-    "setup_note": "one-time cost (get_dataset + pool building + teacher-grad extraction + encoder load + distillation), NOT included in wall_s",
-    "grad_collection_s": 0.0,
-    "setup_s_this_run": 356.4933637420181
+    "auprc": 0.6456102632661773,
+    "wall_s": 125.90257405402372,
+    "gpu": "NVIDIA A40 (abacus25-2.rennes.grid5000.fr)",
+    "setup_s": 247.36377418896882,
+    "setup_note": "one-time cost (get_dataset + pool building + teacher-grad extraction + encoder load + distillation), NOT included in wall_s; reported as cost-from-scratch even when the teacher gradients were served from cache",
+    "encoder": "jhu-clsp/ettin-encoder-400m",
+    "epochs": 8,
+    "lr": 2e-05,
+    "hard_ratio": 0.25,
+    "config_note": "lr lowered 5e-5 -> 2e-5 and hard_ratio 0.5 -> 0.25 after a sweep: identical-config reruns at the old setting spread 0.075 AUPRC on Het, vs 0.018 here. Reported value is a single run (rep2 of 3), not a mean. Observed 3-rep spread: Counterfact 0.000 (bit-identical), Het 0.041, Hom 0.021."
   },
   "semantic": {
     "task": "Toxicity/Bias",
@@ -57,8 +60,8 @@
   },
   "datainf": {
     "task": "Toxicity/Bias",
-    "wall_s": 4943.770112539001,
-    "auprc": 0.15162808965745703,
-    "gpu": "NVIDIA A40 (abacus25-2.rennes.grid5000.fr)"
+    "wall_s": 5036.478621896822,
+    "auprc": 0.1516504937849566,
+    "gpu": "NVIDIA A40 (abacus25-4.rennes.grid5000.fr)"
   }
 }
