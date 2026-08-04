@@ -17,12 +17,14 @@
   },
   "influcoder": {
     "task": "Counterfact",
-    "wall_s": 6.347848967881873,
-    "recall_at_50": 0.46553374295525035,
-    "mrr": 0.8156986531986532,
-    "gpu": "NVIDIA A40 (abacus25-4.rennes.grid5000.fr)",
-    "setup_s": 484.5350846420042,
-    "setup_note": "one-time cost (get_dataset + pool building + teacher-grad extraction + encoder load + distillation), NOT included in wall_s"
+    "wall_s": 6.760866082011489,
+    "recall_at_50": 0.4670931158940837,
+    "mrr": 0.8158008658008657,
+    "gpu": "NVIDIA A40 (abacus25-2.rennes.grid5000.fr)",
+    "setup_s": 462.5345983770094,
+    "setup_note": "one-time cost (get_dataset + pool building + teacher-grad extraction + encoder load + distillation), NOT included in wall_s",
+    "grad_collection_s": 0.0,
+    "setup_s_this_run": 462.5345983770094
   },
   "graddot": {
     "task": "Counterfact",
@@ -47,10 +49,10 @@
   },
   "less": {
     "task": "Counterfact",
-    "wall_s": 1642.4957082879992,
-    "recall_at_50": 0.4936626475188329,
-    "mrr": 0.7793183940242764,
-    "gpu": "NVIDIA RTX 6000 Ada Generation (vercors14-4.grenoble.grid5000.fr)"
+    "wall_s": 2606.6782608951908,
+    "recall_at_50": 0.49904956715607796,
+    "mrr": 0.7665223665223665,
+    "gpu": "NVIDIA A40 (abacus25-4.rennes.grid5000.fr)"
   },
   "semantic": {
     "task": "Counterfact",
@@ -63,9 +65,9 @@
   },
   "datainf": {
     "task": "Counterfact",
-    "wall_s": 3616.1848039210017,
-    "recall_at_50": 0.4721622924370502,
-    "mrr": 0.7649443990353082,
-    "gpu": "NVIDIA RTX 6000 Ada Generation (vercors14-4.grenoble.grid5000.fr)"
+    "wall_s": 6438.723440231988,
+    "recall_at_50": 0.4718592621340199,
+    "mrr": 0.7653051493960585,
+    "gpu": "NVIDIA A40 (abacus25-3.rennes.grid5000.fr)"
   }
 }

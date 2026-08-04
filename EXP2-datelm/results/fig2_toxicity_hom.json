@@ -1,11 +1,13 @@
 {
   "influcoder": {
     "task": "Toxicity/Bias",
-    "wall_s": 424.0210504869465,
-    "auprc": 0.6233330113619031,
-    "gpu": "NVIDIA A40 (abacus25-4.rennes.grid5000.fr)",
-    "setup_s": 471.99402549210936,
-    "setup_note": "one-time cost (get_dataset + pool building + teacher-grad extraction + encoder load + distillation), NOT included in wall_s"
+    "wall_s": 125.44808674301021,
+    "auprc": 0.7743425980155714,
+    "gpu": "NVIDIA A40 (abacus25-1.rennes.grid5000.fr)",
+    "setup_s": 343.4671940521803,
+    "setup_note": "one-time cost (get_dataset + pool building + teacher-grad extraction + encoder load + distillation), NOT included in wall_s",
+    "grad_collection_s": 0.0,
+    "setup_s_this_run": 343.4671940521803
   },
   "bm25": {
     "task": "Toxicity/Bias",
@@ -43,9 +45,9 @@
   },
   "less": {
     "task": "Toxicity/Bias",
-    "wall_s": 4199.353609860998,
-    "auprc": 0.7318079537874367,
-    "gpu": "NVIDIA RTX A5000 (vercors9-5.grenoble.grid5000.fr)"
+    "wall_s": 4726.480469967006,
+    "auprc": 0.7584443743755764,
+    "gpu": "NVIDIA A40 (abacus25-3.rennes.grid5000.fr)"
   },
   "datainf": {
     "task": "Toxicity/Bias",

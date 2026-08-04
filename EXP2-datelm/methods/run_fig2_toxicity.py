@@ -343,6 +343,21 @@ def run_dattri(method_key: str):
 # ============================================================================
 def run_influcoder():
     from methods.influcoder import _bootstrap  # noqa: F401
+
+    # MUST install the cache BEFORE the `from ... import compute_gradient_features`
+    # below: that from-import binds a LOCAL name to whatever the module attribute
+    # points at, at call time. Patching the module attribute afterwards leaves the
+    # already-bound local pointing at the original uncached function, so the cache
+    # silently never engages (this exact ordering bug shipped once -- the runs
+    # completed fine but recomputed gradients and logged grad_collection_s=0.0).
+    #
+    # Teacher gradients are deterministic given the seeded pools + fixed
+    # checkpoint, so they are computed once and reused across every later run
+    # (sweeps, stability reps, re-timings). setup_s is corrected below so a
+    # cached run still reports the true from-scratch cost.
+    from methods.influcoder.grad_cache import install_grad_cache
+    _grad_stats = install_grad_cache(CHECKPOINT, GRAD_CACHE_DIR)
+
     from methods.influcoder.teacher_grads import (
         compute_gradient_features,
         free_teacher_model,
@@ -352,13 +367,6 @@ def run_influcoder():
     )
     from influcoder.encoder import distill, embed, load_encoder
     from influcoder.metrics import spearman_metrics
-    from methods.influcoder.grad_cache import install_grad_cache
-
-    # Teacher gradients are deterministic given the seeded pools + fixed
-    # checkpoint, so they are computed once and reused across every later run
-    # (sweeps, stability reps, re-timings). setup_s is corrected below so a
-    # cached run still reports the true from-scratch cost.
-    _grad_stats = install_grad_cache(CHECKPOINT, GRAD_CACHE_DIR)
 
     def build_wildguard_toxic_pool(local_prompts: set, n_needed: int):
         ds = load_dataset("allenai/wildguardmix", "wildguardtrain")["train"]
