@@ -145,6 +145,12 @@ SETUP_NOTES = {
 # note EXP2.md also documents a GPU-dependent reproducibility gap on this
 # exact config, so don't be surprised by a few points of drift on a different
 # card).
+# Retuned after the sweep in results_influcoder_sweep/summary.json. The old
+# lr=5e-5 (with hard_ratio=0.5 on the toxicity tasks) scored well at times but
+# was irreproducible: identical-config reruns spanned 0.42-0.74 AUPRC on Het.
+# Fixing hard_ratio=0.25 and varying lr gave 2-rep spreads of 0.075 / 0.018 /
+# 0.0007 at 5e-5 / 2e-5 / 1e-5. Removing hard mining entirely was worse on both
+# axes. These are the values that produced the committed results.
 INFLUCODER_ENCODER_MODEL = "jhu-clsp/ettin-encoder-400m"
 INFLUCODER_ENCODER_MAX_LEN = 1024
 INFLUCODER_PROJ_DIM = 8192
@@ -154,7 +160,7 @@ INFLUCODER_N_TEACHER_TRAIN = 2000
 INFLUCODER_N_EVAL_TRAIN = 500
 INFLUCODER_EPOCHS = 8
 INFLUCODER_HARD_RATIO = 0.25
-INFLUCODER_LR = 5e-5
+INFLUCODER_LR = 2e-5
 INFLUCODER_SELECT_BEST_ON = "aggregated"
 
 
