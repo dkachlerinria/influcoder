@@ -39,3 +39,6 @@ EXP2-datelm/results_hardratio_stability/
 # per-run score tensors from the InfluCoder hyperparameter sweep (33MB, regenerable);
 # the summary.json alongside them IS tracked -- it is the evidence for the chosen config
 EXP2-datelm/results_influcoder_sweep/*/
+
+# addendum storage run log (numbers live in addendum_storage.json)
+baselines/out/_addendum_run.log
