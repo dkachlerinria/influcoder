@@ -92,31 +92,42 @@ def encoder_dim(model_name: str) -> int:
 # Analytic widths -- each traced to the line of code that fixes it
 # --------------------------------------------------------------------------- #
 def analytic_rows(target: str, encoders: dict, proj_dim: int, logra_rank: int) -> list[dict]:
+    """Native dtypes below are the ones MEASURED on 2026-08-26 (A5000, n=1000),
+    not the ones the source reads like at a glance -- three of them differ from
+    a naive reading, so each carries why. The headline comparison normalizes
+    all of them to STORE_DTYPE anyway; these matter only for the `native`
+    column."""
     rows = []
     for label, enc_name in encoders.items():
-        d = encoder_dim(enc_name)
         rows.append(dict(
-            method=f"InfluCoder ({label})", dim=d, dtype="float32", itemsize=4,
+            method=f"InfluCoder ({label})", dim=encoder_dim(enc_name),
+            native_dtype="float32", native_itemsize=4,
             note=f"{enc_name} hidden size; influcoder.encoder.embed() returns "
                  f"convert_to_numpy=True -> float32"))
 
-    d = hidden_size(target)
     rows.append(dict(
-        method="RDS+", dim=d, dtype="bfloat16", itemsize=2,
-        note=f"{target} hidden size; rdsplus/score.py keeps the bf16 model dtype "
-             f"through weighted_mean_embeds().cpu()"))
+        method="RDS+", dim=hidden_size(target),
+        native_dtype="float32", native_itemsize=4,
+        note=f"{target} hidden size. Native dtype is fp32, NOT the model's bf16: "
+             f"rdsplus/score.py builds its position weights with torch.arange() "
+             f"(fp32), so `hidden * w` type-promotes the bf16 hidden states"))
 
     rows.append(dict(
-        method="LESS", dim=proj_dim, dtype="float16", itemsize=2,
-        note="cfg.LESS_PROJ_DIM; less_embeds._project() casts to float16 before "
-             "the TRAK projector. Independent of model size AND of LoRA rank"))
+        method="LESS", dim=proj_dim,
+        native_dtype="bfloat16", native_itemsize=2,
+        note="cfg.LESS_PROJ_DIM -- LESS's 'embedding' is its random projection of "
+             "the LoRA gradient down to this width. Native dtype is bf16, NOT the "
+             "fp16 _project() casts its INPUT to: the TRAK projector is constructed "
+             "with dtype=next(model.parameters()).dtype, so it emits at the model "
+             "dtype. Independent of model size AND of LoRA rank"))
 
     n_mod = count_logra_modules(target)
     for r in sorted({logra_rank, 8}, reverse=True):
         rows.append(dict(
-            method=f"LoGra (r={r})", dim=n_mod * r ** 2, dtype="bfloat16", itemsize=2,
-            note=f"{n_mod} target modules x r^2={r ** 2}; modeling_logra.step() concatenates "
-                 f"flattened [B,r,r] blocks in model dtype"
+            method=f"LoGra (r={r})", dim=n_mod * r ** 2,
+            native_dtype="float32", native_itemsize=4,
+            note=f"{n_mod} target modules x r^2={r ** 2}; modeling_logra.step() "
+                 f"concatenates flattened [B,r,r] blocks, accumulated in fp32"
                  + ("  [biggpu / final run]" if r == logra_rank else "  [historical config.py profile]")))
     return rows
 
@@ -132,15 +143,42 @@ def load_samples(n: int, seed: int = 42):
     return pool[:n]
 
 
-def measure_tensor(x) -> dict:
-    """In-memory nbytes plus the real on-disk size of a torch.save artifact."""
-    import numpy as np
-    t = torch.from_numpy(x) if isinstance(x, np.ndarray) else x
+# Set once in main(). The common dtype every method's representation is cast
+# to before the headline measurement, so the ONLY thing that differs between
+# methods is the width of the vector -- see _stats/measure_tensor.
+STORE_DTYPE = torch.float32
+
+
+def _stats(t) -> dict:
     with tempfile.NamedTemporaryFile(suffix=".pt", delete=True) as f:
         torch.save(t, f.name)
         on_disk = Path(f.name).stat().st_size
     return dict(shape=tuple(t.shape), dtype=str(t.dtype),
                 nbytes=t.numel() * t.element_size(), on_disk=on_disk)
+
+
+def measure_tensor(x) -> dict:
+    """Two measurements of the same representation:
+
+    `native`     -- exactly what the method's own code path produces. These
+                    dtypes are NOT uniform across methods and several are not
+                    what the source reads like at a glance (RDS+ type-promotes
+                    to fp32 via its fp32 position weights; LESS's TRAK
+                    projector is built at the model dtype so it emits bf16
+                    despite casting its input to fp16; LoGra accumulates
+                    per-sample gradients in fp32). Kept because it is the
+                    truth about each implementation.
+
+    `normalized` -- the same tensor cast to STORE_DTYPE. This is the headline
+                    number: with dtype held constant, the only thing that can
+                    make one method's index bigger than another's is the width
+                    of the vector it stores per example (for LESS, that width
+                    IS its projection dim -- projecting down to a smaller space
+                    is exactly the "embedding size" being compared).
+    """
+    import numpy as np
+    t = torch.from_numpy(x) if isinstance(x, np.ndarray) else x
+    return dict(native=_stats(t), normalized=_stats(t.to(STORE_DTYPE)))
 
 
 def real_influcoder(samples, enc_name: str, max_len: int) -> dict:
@@ -226,6 +264,10 @@ def main():
     ap.add_argument("--proj_dim", type=int, default=8192, help="cfg.LESS_PROJ_DIM")
     ap.add_argument("--logra_rank", type=int, default=32, help="cfg.LOGRA_RANK (biggpu)")
     ap.add_argument("--max_len", type=int, default=1024, help="cfg.MAX_LEN")
+    ap.add_argument("--store_dtype", default="float32",
+                    choices=["float32", "float16", "bfloat16"],
+                    help="common dtype every method is cast to for the headline "
+                         "comparison, so only vector width differs between methods")
     ap.add_argument("--less_rank", type=int, default=8, help="cfg.LESS_RANK (biggpu)")
     ap.add_argument("--less_alpha", type=int, default=512, help="cfg.LESS_LORA_ALPHA")
     ap.add_argument("--less_project_interval", type=int, default=8)
@@ -236,6 +278,9 @@ def main():
                     help="run the target-model methods on CPU anyway (slow)")
     ap.add_argument("--out", default="baselines/out/addendum_storage.json")
     args = ap.parse_args()
+
+    global STORE_DTYPE
+    STORE_DTYPE = getattr(torch, args.store_dtype)
 
     encoders = {"68m": "jhu-clsp/ettin-encoder-68m",
                 "150m": "jhu-clsp/ettin-encoder-150m"}
@@ -281,16 +326,24 @@ def main():
                 row["measured"] = {"error": f"{type(e).__name__}: {e}"}
 
     n, N = args.n, args.extrapolate_to
-    print(f"{'Method':<22} {'dim':>9} {'dtype':>10} {'B/example':>11} "
-          f"{'n=' + str(n):>12} {'n=' + str(N):>12}  {'vs InfluCoder-68m':>18}")
-    print("-" * 104)
+    store_bytes = torch.empty(0, dtype=STORE_DTYPE).element_size()
+    print(f"\nHeadline: every method cast to a COMMON dtype ({args.store_dtype}, "
+          f"{store_bytes} B/dim), so the only difference between rows is the width "
+          f"of the per-example vector.\n")
+    print(f"{'Method':<22} {'dim':>9} {'B/example':>11} {'n=' + str(n):>12} "
+          f"{'n=' + str(N):>12}  {'vs InfluCoder-68m':>18}   {'native dtype':>13}")
+    print("-" * 110)
     base = None
     for row in rows:
-        per = row["dim"] * row["itemsize"]
+        per = row["dim"] * store_bytes
+        row["bytes_per_example_normalized"] = per
+        row["bytes_per_example_native"] = row["dim"] * row["native_itemsize"]
+        row["store_dtype"] = args.store_dtype
         if base is None:
             base = per
-        print(f"{row['method']:<22} {row['dim']:>9,} {row['dtype']:>10} {per:>11,} "
-              f"{human(per * n):>12} {human(per * N):>12}  {per / base:>17.1f}x")
+        print(f"{row['method']:<22} {row['dim']:>9,} {per:>11,} "
+              f"{human(per * n):>12} {human(per * N):>12}  {per / base:>17.1f}x   "
+              f"{row['native_dtype']:>13}")
 
     print()
     for row in rows:
