@@ -1,0 +1,109 @@
+{
+  "setup": {
+    "target": "Qwen/Qwen3-4B",
+    "proj_dim": 8192,
+    "logra_rank": 32,
+    "max_len": 1024,
+    "n": 1000,
+    "extrapolate_to": 1000,
+    "mode": "real"
+  },
+  "rows": [
+    {
+      "method": "InfluCoder (68m)",
+      "dim": 512,
+      "dtype": "float32",
+      "itemsize": 4,
+      "note": "jhu-clsp/ettin-encoder-68m hidden size; influcoder.encoder.embed() returns convert_to_numpy=True -> float32",
+      "measured": {
+        "shape": [
+          1000,
+          512
+        ],
+        "dtype": "torch.float32",
+        "nbytes": 2048000,
+        "on_disk": 2049605
+      }
+    },
+    {
+      "method": "InfluCoder (150m)",
+      "dim": 768,
+      "dtype": "float32",
+      "itemsize": 4,
+      "note": "jhu-clsp/ettin-encoder-150m hidden size; influcoder.encoder.embed() returns convert_to_numpy=True -> float32",
+      "measured": {
+        "shape": [
+          1000,
+          768
+        ],
+        "dtype": "torch.float32",
+        "nbytes": 3072000,
+        "on_disk": 3073605
+      }
+    },
+    {
+      "method": "RDS+",
+      "dim": 2560,
+      "dtype": "bfloat16",
+      "itemsize": 2,
+      "note": "Qwen/Qwen3-4B hidden size; rdsplus/score.py keeps the bf16 model dtype through weighted_mean_embeds().cpu()",
+      "measured": {
+        "shape": [
+          1000,
+          2560
+        ],
+        "dtype": "torch.float32",
+        "nbytes": 10240000,
+        "on_disk": 10241605
+      }
+    },
+    {
+      "method": "LESS",
+      "dim": 8192,
+      "dtype": "float16",
+      "itemsize": 2,
+      "note": "cfg.LESS_PROJ_DIM; less_embeds._project() casts to float16 before the TRAK projector. Independent of model size AND of LoRA rank",
+      "measured": {
+        "shape": [
+          1000,
+          8192
+        ],
+        "dtype": "torch.bfloat16",
+        "nbytes": 16384000,
+        "on_disk": 16385605
+      }
+    },
+    {
+      "method": "LoGra (r=32)",
+      "dim": 258048,
+      "dtype": "bfloat16",
+      "itemsize": 2,
+      "note": "252 target modules x r^2=1024; modeling_logra.step() concatenates flattened [B,r,r] blocks in model dtype  [biggpu / final run]",
+      "measured": {
+        "shape": [
+          1000,
+          258048
+        ],
+        "dtype": "torch.float32",
+        "nbytes": 1032192000,
+        "on_disk": 1032193605
+      }
+    },
+    {
+      "method": "LoGra (r=8)",
+      "dim": 16128,
+      "dtype": "bfloat16",
+      "itemsize": 2,
+      "note": "252 target modules x r^2=64; modeling_logra.step() concatenates flattened [B,r,r] blocks in model dtype  [historical config.py profile]",
+      "measured": {
+        "shape": [
+          1000,
+          16128
+        ],
+        "dtype": "torch.float32",
+        "nbytes": 64512000,
+        "on_disk": 64513605
+      }
+    }
+  ]
+}
