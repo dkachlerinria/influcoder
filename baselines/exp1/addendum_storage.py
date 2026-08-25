@@ -59,7 +59,7 @@ LOGRA_TARGET_SUFFIXES = ["q_proj", "k_proj", "v_proj", "o_proj",
 
 def human(n_bytes: float) -> str:
     for unit in ["B", "KiB", "MiB", "GiB", "TiB"]:
-        if abs(n_bytes) < 1024 or unit == "TiB":
+        if (abs(n_bytes) < 1024 if unit == "B" else abs(n_bytes) < 1000) or unit == "TiB":
             return f"{n_bytes:,.1f} {unit}" if unit != "B" else f"{n_bytes:,.0f} B"
         n_bytes /= 1024
 
@@ -149,6 +149,16 @@ def load_samples(n: int, seed: int = 42):
 STORE_DTYPE = torch.float32
 
 
+def _free_gpu():
+    """Each real_* loads a full target model; without this they stack up and a
+    later method OOMs on a smaller card -- and that OOM would be swallowed into
+    measured.error while the table still printed a complete-looking row."""
+    import gc
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
+
 def _stats(t) -> dict:
     with tempfile.NamedTemporaryFile(suffix=".pt", delete=True) as f:
         torch.save(t, f.name)
@@ -178,7 +188,17 @@ def measure_tensor(x) -> dict:
     """
     import numpy as np
     t = torch.from_numpy(x) if isinstance(x, np.ndarray) else x
-    return dict(native=_stats(t), normalized=_stats(t.to(STORE_DTYPE)))
+    cast = t.to(STORE_DTYPE)
+    norm = _stats(cast)
+    # Casting DOWN (e.g. --store_dtype float16 over LoGra/LESS fp32 gradient
+    # magnitudes) can overflow to inf. Byte counts stay correct either way --
+    # they are all this addendum uses -- but the cast tensor would be
+    # numerically useless, so say so rather than let it pass silently.
+    if not torch.isfinite(cast).all():
+        norm["nonfinite_after_cast"] = True
+        norm["warning"] = ("values overflowed casting to STORE_DTYPE; byte counts "
+                           "are still valid, the cast tensor is not")
+    return dict(native=_stats(t), normalized=norm)
 
 
 def real_influcoder(samples, enc_name: str, max_len: int) -> dict:
@@ -189,7 +209,10 @@ def real_influcoder(samples, enc_name: str, max_len: int) -> dict:
     from influcoder.encoder import embed, load_encoder
     device = "cuda" if torch.cuda.is_available() else "cpu"
     enc = load_encoder(enc_name, device=device, max_seq_len=max_len)
-    return measure_tensor(embed(enc, [s.text for s in samples]))
+    emb = embed(enc, [s.text for s in samples])
+    del enc
+    _free_gpu()
+    return measure_tensor(emb)
 
 
 def real_rdsplus(samples, target: str, max_len: int) -> dict:
@@ -205,7 +228,10 @@ def real_rdsplus(samples, target: str, max_len: int) -> dict:
     model = AutoModelForCausalLM.from_pretrained(target, torch_dtype=torch.bfloat16)
     model.to(device).eval()
     dl = DataLoader(tokenized_dataset(tok, samples, max_len), batch_size=1, shuffle=False)
-    return measure_tensor(weighted_mean_embeds(model, dl, device))
+    embeds = weighted_mean_embeds(model, dl, device)
+    del model
+    _free_gpu()
+    return measure_tensor(embeds)
 
 
 def real_less(samples, target: str, max_len: int, proj_dim: int,
@@ -232,8 +258,11 @@ def real_less(samples, target: str, max_len: int, proj_dim: int,
     g, _ = collect_grads(dl, model, proj_dim=proj_dim, adam_optimizer_state=None,
                          gradient_type="sgd", project_interval=project_interval,
                          block_size=block_size)
-    return measure_tensor(normalize_embeddings_in_chunks(
-        g, chunk_size=10000, dim=1, eps=1e-12, in_place=False))
+    out = normalize_embeddings_in_chunks(g, chunk_size=10000, dim=1, eps=1e-12,
+                                         in_place=False)
+    del model, g
+    _free_gpu()
+    return measure_tensor(out)
 
 
 def real_logra(samples, target: str, max_len: int, rank: int, attn: str) -> dict:
@@ -250,8 +279,11 @@ def real_logra(samples, target: str, max_len: int, rank: int, attn: str) -> dict
     if tok.pad_token is None:
         tok.pad_token = tok.eos_token
     ds = tokenized_dataset(tok, samples, max_len)
-    return measure_tensor(torch.as_tensor(
-        logra.encode(ds, batch_size=1, is_test=False, show_progress_bar=False)))
+    embeds = torch.as_tensor(
+        logra.encode(ds, batch_size=1, is_test=False, show_progress_bar=True))
+    del logra
+    _free_gpu()
+    return measure_tensor(embeds)
 
 
 def main():
@@ -303,7 +335,7 @@ def main():
                         row["measured"] = {"skipped": (
                             f"no GPU on this host: {args.target} forward passes at "
                             f"batch_size=1 are not tractable on CPU at n={args.n}. "
-                            "Analytic width still applies (hidden size x bf16); "
+                            "Analytic width still applies (hidden size x fp32); "
                             "re-run on a GPU node, or pass --force_cpu_target.")}
                 elif row["method"] == "LESS":
                     if torch.cuda.is_available() or args.force_cpu_target:
@@ -327,29 +359,64 @@ def main():
 
     n, N = args.n, args.extrapolate_to
     store_bytes = torch.empty(0, dtype=STORE_DTYPE).element_size()
+
+    def row_status(row) -> str:
+        """A row whose method errored or was skipped still has analytic numbers,
+        so without this marker the table would look complete when it is not."""
+        m = row.get("measured")
+        if m is None:
+            return "" if args.mode == "analytic" else "  (not run)"
+        if "error" in m:
+            return "  !! FAILED"
+        if "skipped" in m:
+            return "  -- skipped"
+        got = m.get("native", {}).get("shape", (None,))[0]
+        return "  measured" if got == n else f"  !! ROWS={got}, expected {n}"
+
+    # The ratio baseline is looked up by name rather than taken as rows[0], so
+    # reordering the encoder dict can never make the column header lie.
+    BASE_METHOD = "InfluCoder (68m)"
+    base_row = next((r for r in rows if r["method"] == BASE_METHOD), rows[0])
+    base = base_row["dim"] * store_bytes
+
     print(f"\nHeadline: every method cast to a COMMON dtype ({args.store_dtype}, "
           f"{store_bytes} B/dim), so the only difference between rows is the width "
           f"of the per-example vector.\n")
-    print(f"{'Method':<22} {'dim':>9} {'B/example':>11} {'n=' + str(n):>12} "
-          f"{'n=' + str(N):>12}  {'vs InfluCoder-68m':>18}   {'native dtype':>13}")
-    print("-" * 110)
-    base = None
+    # Only show the projected column when it is actually a projection.
+    show_proj = N != n
+    hdr = (f"{'Method':<22} {'dim':>9} {'B/example':>11} {'n=' + str(n):>12}")
+    if show_proj:
+        hdr += f" {'n=' + str(N) + ' (proj)':>17}"
+    hdr += f"  {'vs ' + BASE_METHOD:>22}   {'native dtype':>13}  status"
+    print(hdr)
+    print("-" * (len(hdr) + 8))
+
     for row in rows:
         per = row["dim"] * store_bytes
         row["bytes_per_example_normalized"] = per
         row["bytes_per_example_native"] = row["dim"] * row["native_itemsize"]
         row["store_dtype"] = args.store_dtype
-        if base is None:
-            base = per
-        print(f"{row['method']:<22} {row['dim']:>9,} {per:>11,} "
-              f"{human(per * n):>12} {human(per * N):>12}  {per / base:>17.1f}x   "
-              f"{row['native_dtype']:>13}")
+        line = (f"{row['method']:<22} {row['dim']:>9,} {per:>11,} "
+                f"{human(per * n):>12}")
+        if show_proj:
+            line += f" {human(per * N):>17}"
+        line += (f"  {per / base:>21.1f}x   {row['native_dtype']:>13}"
+                 f"{row_status(row)}")
+        print(line)
 
     print()
     for row in rows:
         print(f"  {row['method']:<22} {row['note']}")
         if "measured" in row:
             print(f"  {'':<22} MEASURED: {row['measured']}")
+
+    failed = [r["method"] for r in rows
+              if isinstance(r.get("measured"), dict)
+              and ("error" in r["measured"] or "skipped" in r["measured"])]
+    bad_rows = [r["method"] for r in rows
+                if isinstance(r.get("measured"), dict)
+                and "native" in r["measured"]
+                and r["measured"]["native"]["shape"][0] != n]
 
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -358,6 +425,13 @@ def main():
                    max_len=args.max_len, n=n, extrapolate_to=N, mode=args.mode),
         rows=rows), indent=2))
     print(f"\nwrote {out}")
+
+    if failed or bad_rows:
+        if failed:
+            print(f"\nFAILED/SKIPPED: {failed}")
+        if bad_rows:
+            print(f"WRONG ROW COUNT (expected {n}): {bad_rows}")
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":
