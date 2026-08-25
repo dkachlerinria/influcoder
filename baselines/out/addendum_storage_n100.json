@@ -1,0 +1,193 @@
+{
+  "setup": {
+    "target": "Qwen/Qwen3-4B",
+    "proj_dim": 8192,
+    "logra_rank": 32,
+    "max_len": 1024,
+    "n": 100,
+    "extrapolate_to": 1000,
+    "mode": "real"
+  },
+  "rows": [
+    {
+      "method": "InfluCoder (68m)",
+      "dim": 512,
+      "native_dtype": "float32",
+      "native_itemsize": 4,
+      "note": "jhu-clsp/ettin-encoder-68m hidden size; influcoder.encoder.embed() returns convert_to_numpy=True -> float32",
+      "measured": {
+        "native": {
+          "shape": [
+            100,
+            512
+          ],
+          "dtype": "torch.float32",
+          "nbytes": 204800,
+          "on_disk": 206405
+        },
+        "normalized": {
+          "shape": [
+            100,
+            512
+          ],
+          "dtype": "torch.float32",
+          "nbytes": 204800,
+          "on_disk": 206405
+        }
+      },
+      "bytes_per_example_normalized": 2048,
+      "bytes_per_example_native": 2048,
+      "store_dtype": "float32"
+    },
+    {
+      "method": "InfluCoder (150m)",
+      "dim": 768,
+      "native_dtype": "float32",
+      "native_itemsize": 4,
+      "note": "jhu-clsp/ettin-encoder-150m hidden size; influcoder.encoder.embed() returns convert_to_numpy=True -> float32",
+      "measured": {
+        "native": {
+          "shape": [
+            100,
+            768
+          ],
+          "dtype": "torch.float32",
+          "nbytes": 307200,
+          "on_disk": 308805
+        },
+        "normalized": {
+          "shape": [
+            100,
+            768
+          ],
+          "dtype": "torch.float32",
+          "nbytes": 307200,
+          "on_disk": 308805
+        }
+      },
+      "bytes_per_example_normalized": 3072,
+      "bytes_per_example_native": 3072,
+      "store_dtype": "float32"
+    },
+    {
+      "method": "RDS+",
+      "dim": 2560,
+      "native_dtype": "float32",
+      "native_itemsize": 4,
+      "note": "Qwen/Qwen3-4B hidden size. Native dtype is fp32, NOT the model's bf16: rdsplus/score.py builds its position weights with torch.arange() (fp32), so `hidden * w` type-promotes the bf16 hidden states",
+      "measured": {
+        "native": {
+          "shape": [
+            100,
+            2560
+          ],
+          "dtype": "torch.float32",
+          "nbytes": 1024000,
+          "on_disk": 1025605
+        },
+        "normalized": {
+          "shape": [
+            100,
+            2560
+          ],
+          "dtype": "torch.float32",
+          "nbytes": 1024000,
+          "on_disk": 1025605
+        }
+      },
+      "bytes_per_example_normalized": 10240,
+      "bytes_per_example_native": 10240,
+      "store_dtype": "float32"
+    },
+    {
+      "method": "LESS",
+      "dim": 8192,
+      "native_dtype": "bfloat16",
+      "native_itemsize": 2,
+      "note": "cfg.LESS_PROJ_DIM -- LESS's 'embedding' is its random projection of the LoRA gradient down to this width. Native dtype is bf16, NOT the fp16 _project() casts its INPUT to: the TRAK projector is constructed with dtype=next(model.parameters()).dtype, so it emits at the model dtype. Independent of model size AND of LoRA rank",
+      "measured": {
+        "native": {
+          "shape": [
+            100,
+            8192
+          ],
+          "dtype": "torch.bfloat16",
+          "nbytes": 1638400,
+          "on_disk": 1640005
+        },
+        "normalized": {
+          "shape": [
+            100,
+            8192
+          ],
+          "dtype": "torch.float32",
+          "nbytes": 3276800,
+          "on_disk": 3278405
+        }
+      },
+      "bytes_per_example_normalized": 32768,
+      "bytes_per_example_native": 16384,
+      "store_dtype": "float32"
+    },
+    {
+      "method": "LoGra (r=32)",
+      "dim": 258048,
+      "native_dtype": "float32",
+      "native_itemsize": 4,
+      "note": "252 target modules x r^2=1024; modeling_logra.step() concatenates flattened [B,r,r] blocks, accumulated in fp32  [biggpu / final run]",
+      "measured": {
+        "native": {
+          "shape": [
+            100,
+            258048
+          ],
+          "dtype": "torch.float32",
+          "nbytes": 103219200,
+          "on_disk": 103220805
+        },
+        "normalized": {
+          "shape": [
+            100,
+            258048
+          ],
+          "dtype": "torch.float32",
+          "nbytes": 103219200,
+          "on_disk": 103220805
+        }
+      },
+      "bytes_per_example_normalized": 1032192,
+      "bytes_per_example_native": 1032192,
+      "store_dtype": "float32"
+    },
+    {
+      "method": "LoGra (r=8)",
+      "dim": 16128,
+      "native_dtype": "float32",
+      "native_itemsize": 4,
+      "note": "252 target modules x r^2=64; modeling_logra.step() concatenates flattened [B,r,r] blocks, accumulated in fp32  [historical config.py profile]",
+      "measured": {
+        "native": {
+          "shape": [
+            100,
+            16128
+          ],
+          "dtype": "torch.float32",
+          "nbytes": 6451200,
+          "on_disk": 6452805
+        },
+        "normalized": {
+          "shape": [
+            100,
+            16128
+          ],
+          "dtype": "torch.float32",
+          "nbytes": 6451200,
+          "on_disk": 6452805
+        }
+      },
+      "bytes_per_example_normalized": 64512,
+      "bytes_per_example_native": 64512,
+      "store_dtype": "float32"
+    }
+  ]
+}
