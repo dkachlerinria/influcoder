@@ -1,8 +1,8 @@
 """Puts the parent `influcoder` repo's package on sys.path.
 
 Import this before importing anything from `influcoder.*`. This benchmark
-integration (EXP2-datelm) lives nested one level inside the `influcoder` repo
-(.../influcoder/EXP2-datelm/methods/influcoder/_bootstrap.py), with the
+integration (datelm) lives nested one level inside the `influcoder` repo
+(.../influcoder/datelm/methods/influcoder/_bootstrap.py), with the
 `influcoder` package itself at the repo root (.../influcoder/influcoder/) --
 `parents[3]` from this file lands on that repo root. Override with the
 INFLUCODER_REPO_PATH env var if this checkout ever moves elsewhere.

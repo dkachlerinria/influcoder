@@ -1,28 +1,34 @@
 #!/usr/bin/env python3
-"""Estimate LESS/Grad_Sim/DataInf wall-clock on the Counterfact task WITHOUT a
-full run -- Counterfact analog of `time_toxicity_subset.py` (same method,
-same rationale: two small train subsets, linear fit, extrapolate to the full
-5,473-example train set, rather than running to completion or babysitting a
-partial run and eyeballing the tqdm rate).
+"""Estimate LESS/Grad_Sim/DataInf wall-clock on the Toxicity/Bias task WITHOUT a full run.
 
-For Grad_Sim/LESS, `cache()` is O(1) (just stores the dataloader reference)
-so timing it costs nothing extra. For DataInf it is NOT free:
-`IFAttributorDataInf.cache()` runs a real backward pass over
-`ceil(n * fim_estimate_data_ratio)` train examples to estimate the FIM,
-scaling with subset size exactly like `attribute()` does -- so both are timed
-together for the extrapolation to be correct.
+EXP2.md section 9 has a completed Grad Sim/Toxicity-Bias number (1764s, A40) but
+LESS/Toxicity-Bias was killed at 56% (~50min in, GPU reclaimed) with no number,
+and DataInf/Toxicity-Bias was never run at all. Both existing numbers are on an
+A40 anyway, not the RTX 6000 Ada this session is using. Rather than running any
+method to completion, this times `attributor.cache()` + `attributor.attribute()`
+together (see dattri/algorithm/base.py and influence_function.py) on two small
+train subsets and fits a line, the same way `baselines/time_logra_batch.py`
+derives ms/sample from a handful of timed points instead of a full sweep.
 
-Mirrors dattri.py's actual method construction (get_lora_layers/
-get_lora_modules, same AttributionTask/attributor classes) so the estimate
-reflects the real code path, not an approximation of it.
+For Grad_Sim/LESS, `cache()` is O(1) (just stores the dataloader reference) so
+timing it costs nothing extra. For DataInf it is NOT free: `IFAttributorDataInf
+.cache()` runs a real backward pass over `ceil(n * fim_estimate_data_ratio)`
+train examples to estimate the FIM, scaling with subset size exactly like
+`attribute()` does -- so both must be timed together for the extrapolation to
+be correct.
 
-Usage (from EXP2-datelm/, with the litgpt/lightning stub packages on
-PYTHONPATH -- see run_repsim_counterfact.py's docstring for why/what):
-    PYTHONPATH=_stubs:. ../.venv_h100/bin/python methods/time_counterfact_subset.py \
+Mirrors dattri.py's actual method construction (get_lora_layers/get_lora_modules,
+same AttributionTask/attributor classes) so the estimate reflects the real code
+path, not an approximation of it. Mirrors run_repsim_counterfact.py's
+model-load-vs-compute split (t_model_load reported separately from the timed
+compute) and its litgpt/lightning stub requirement (see PYTHONPATH note below).
+
+Usage (from datelm/, with the stub packages on PYTHONPATH):
+    PYTHONPATH=_stubs:. ../.venv_py311/bin/python methods/time_toxicity_subset.py \
         --method LESS --n_a 30 --n_b 150
-    PYTHONPATH=_stubs:. ../.venv_h100/bin/python methods/time_counterfact_subset.py \
+    PYTHONPATH=_stubs:. ../.venv_py311/bin/python methods/time_toxicity_subset.py \
         --method Grad_Sim --n_a 30 --n_b 150
-    PYTHONPATH=_stubs:. ../.venv_h100/bin/python methods/time_counterfact_subset.py \
+    PYTHONPATH=_stubs:. ../.venv_py311/bin/python methods/time_toxicity_subset.py \
         --method DataInf --n_a 30 --n_b 150
 """
 from __future__ import annotations
@@ -45,12 +51,12 @@ from dattri.algorithm.base import BaseCosineSimilarityAttributor
 from dattri.algorithm.influence_function import IFAttributorLESS, IFAttributorDataInf  # noqa: E402
 from dattri.task import AttributionTask  # noqa: E402
 
-TASK = "Counterfact"
-SUBSET = "Pythia-1b"
+TASK = "Toxicity/Bias"
+SUBSET = "XSTest-response-Het"
 CONFIG_PATH = {
-    "LESS": project_root / "configs/factual-attribution-less.yaml",
-    "Grad_Sim": project_root / "configs/factual-attribution-gradsim.yaml",
-    "DataInf": project_root / "configs/factual-attribution-datainf.yaml",
+    "LESS": project_root / "configs/toxicity-bias-less.yaml",
+    "Grad_Sim": project_root / "configs/toxicity-bias-gradsim.yaml",
+    "DataInf": project_root / "configs/toxicity-bias-datainf.yaml",
 }
 
 
@@ -133,10 +139,17 @@ def main():
           f"{t_attributor_init:.1f}s\n")
 
     # Warmup: the first attribute() call pays a one-time cost (functorch/vmap
-    # transform tracing, cudnn/kernel autotune) unrelated to steady-state
-    # per-example cost. Absorb it on a throwaway subset so both timed points
-    # below are warm. For DataInf, cache() is NOT free (see module docstring),
-    # so time cache()+attribute() together for every point, including warmup.
+    # transform tracing, cudnn/kernel autotune -- visible as the "no batching
+    # rule for aten::_scaled_dot_product_flash_attention_backward" warning)
+    # that has nothing to do with steady-state per-example cost. Absorb it
+    # here on a throwaway subset so the two timed points below are both warm.
+    # NOTE: for DataInf, cache() is NOT free -- IFAttributorDataInf.cache() runs
+    # a real backward pass over ceil(len(loader) * fim_estimate_data_ratio)
+    # train examples to estimate the FIM, so it scales with subset size just
+    # like attribute() does (see dattri/algorithm/influence_function.py's
+    # IFAttributorDataInf.cache). For Grad_Sim/LESS, cache() is O(1) (just
+    # stores the dataloader reference) so timing it alongside attribute() is
+    # harmless. Time both together so the fit is correct for all three methods.
     warmup_n = min(args.warmup_n, args.n_a)
     warmup_subset = train.select(range(warmup_n))
     warmup_loader = get_loader(prepare_chat_format(warmup_subset), tokenizer)
@@ -166,7 +179,7 @@ def main():
     if n_b == n_a:
         raise SystemExit("--n_a and --n_b must differ to fit a slope")
     per_example_s = (t_b - t_a) / (n_b - n_a)
-    fixed_per_call_s = t_a - n_a * per_example_s  # ~= cost of ref/test gradient pass, held constant
+    fixed_per_call_s = t_a - n_a * per_example_s  # ~= cost of test/ref gradient pass, held constant
 
     full_attribute_s = fixed_per_call_s + n_train_full * per_example_s
     total_wall_s = t_model_load + t_attributor_init + full_attribute_s

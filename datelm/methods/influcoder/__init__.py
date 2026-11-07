@@ -1,7 +1,7 @@
 """DATE-LM <-> InfluCoder glue.
 
 Everything in this subpackage is new code local to this benchmark
-integration (EXP2-datelm). It does not modify the parent `influcoder` repo's
+integration (datelm). It does not modify the parent `influcoder` repo's
 own package -- it only imports its (model-agnostic) library code:
 `influcoder.gradients.CountSketch`/`hardware_profile` and
 `influcoder.encoder.load_encoder`/`distill`/`embed`. See
