@@ -1,73 +1,97 @@
 # InfluCoder
 
-Distill gradient-influence rankings into a small text bi-encoder, so that at
-selection time scoring a candidate is one encoder forward pass instead of a
-forward+backward through the target LM.
+Code for **"Influcoder: Distilling Decoders' Gradient Influence Rankings into an Encoder for Data Attribution"** (AACL-IJCNLP 2026).
+[Paper](TODO-link) · [Citation](#citation)
 
-**Method.** Attach a fresh, seeded LoRA adapter to a target LM. Each sample's
-loss gradient on the adapter, sketched to `proj_dim` dims with a seeded
-CountSketch, is its *influence feature*; influence(anchor, candidate) =
-cosine of their features. On a **train** split of anchors x pool we compute
-that matrix and train a sentence encoder to reproduce it from text
-(Pearson + listwise-KL loss). On a **disjoint eval** split we compute the same
-gradient matrix as ground truth and report Spearman rank agreement of the
-encoder's scores against it — versus the untrained encoder as baseline.
+Gradient-based data attribution (LESS, LoGRA, …) needs a forward *and* backward pass through the target LM for
+every candidate example. InfluCoder distills those gradient-influence rankings into a small text bi-encoder:
+at selection time, scoring a candidate costs one encoder forward pass.
 
-Anchors come from BBH (`data/eval/bbh/`, checked in), candidates from Dolly
-(`dolly/dolly_data.jsonl`, checked in). No downloads, no intermediate files.
+<!-- TODO: overview figure, e.g. results/fig1_dolci/biggpu/seed0/figure1.png -->
 
-## Layout
+**Method in one paragraph.** Attach a fresh, seeded LoRA adapter to the target LM. Each example's loss gradient on
+the adapter, sketched to `proj_dim` dimensions with a seeded CountSketch, is its influence feature;
+influence(anchor, candidate) is the cosine of the two features. On a train split of anchors × candidates we compute
+that matrix and train a sentence encoder to reproduce it from text (Pearson + listwise-KL loss). On a disjoint eval
+split we report the Spearman rank agreement of the encoder's scores with the gradient ground truth.
 
-```
-run.py                    pipeline runner: presets, orchestration, results.json
-influcoder/data.py        BBH + Dolly loading, disjoint splits, text views
-influcoder/gradients.py   LoRA featurizer, CountSketch, projection-fidelity check
-influcoder/encoder.py     bi-encoder distillation (Pearson+KL loss, training loop)
-influcoder/metrics.py     Spearman metrics
-```
-
-## Setup & run
+## Installation
 
 ```bash
+git clone <this repo> && cd influcoder
 pip install -r requirements.txt
-
-python run.py --preset sanity   # smallest end-to-end check + projection fidelity
-python run.py --preset tiny     # small but non-degenerate reproduction
-python run.py --preset push     # bigger train side, hard-negative mining
-python run.py --preset big      # bigger eval+train, no mining, fewer epochs
+# Figure 1 experiments (Qwen3 teachers, LESS baseline) additionally need:
+pip install "transformers>=4.51" traker      # optional: fast_jl for the CUDA TRAK projector
 ```
 
-Defaults: `SmolLM2-135M` as gradient source, `ettin-encoder-68m` as encoder
-(both configurable via `--grad_model` / `--encoder_model`). Each run writes to
-`runs_out/<preset>/` (gitignored -- these are outputs, not source):
+Tested with Python 3.11 and PyTorch 2.6–2.7 on A40 / RTX PRO 6000 GPUs. Pre-Ampere GPUs fall back to fp32 + eager
+attention automatically.
 
-- `results.json` -- config, baseline/trained Spearman, per-epoch metrics, timings
-- `encoder/` -- the trained encoder (best-checkpoint-restored), loadable directly:
-  ```python
-  from sentence_transformers import SentenceTransformer
-  enc = SentenceTransformer("runs_out/<preset>/encoder")
-  ```
+## Data
 
-The sanity preset also runs a **projection fidelity check**: exact pairwise
-gradient cosines vs. sketched cosines on held full gradients — the numeric
-proof that the featurizer core is correct, independent of any reference
-implementation.
-
-## Hardware
-
-The code picks dtype/attention from the GPU's compute capability:
-
-| GPU | What runs | Expected speed |
+| What | Where | Source |
 |---|---|---|
-| Ampere or newer (A100, H100, A40, RTX 30/40/50xx) | bf16 + SDPA/flash | ~20–60 ms per gradient sample (135M model) |
-| Older (P100, V100) | fp32 + eager fallback | ~1 s per gradient sample — works, but slow |
+| BBH anchors | `data/eval/bbh/` (checked in) | BIG-Bench Hard |
+| Dolly candidates | `data/dolly/dolly_data.jsonl` (checked in) | databricks-dolly-15k |
+| dolci-instruct candidates (Figure 1) | downloaded on first use | `tasksource/dolci-instruct` (HF) |
+| DATE-LM tasks and checkpoints | downloaded on first use | `DataAttributionEval/*` (HF) |
 
-Per-sample gradient extraction is the only real cost and it is embarrassingly
-parallel across samples; `torch.func` vmap'd per-sample gradients or sharding
-across GPUs are the known next steps if scale demands it.
+## Quickstart
 
-## Correctness anchor
+```bash
+bash scripts/quickstart.sh          # = python run.py --preset sanity && python run.py --preset tiny
+```
 
-The original full pipeline this was rewritten from is preserved at the git tag
-`legacy-pipeline` (and in the upstream `tis-ie` repo). It is a reference
-oracle for cross-checking outputs if results ever look wrong — not a template.
+`run.py` computes the gradient ground truth with a small teacher (SmolLM2-135M by default), distills it into
+`ettin-encoder-68m`, and writes `runs_out/<preset>/results.json` (untrained vs. trained Spearman) and the trained
+encoder, loadable with `SentenceTransformer("runs_out/<preset>/encoder")`.
+
+## Reproducing the paper
+
+| Paper result | Command | Output (committed copy) |
+|---|---|---|
+| **Figure 1**: agreement with gradient influence (Qwen3-4B ground truth) vs. cost; InfluCoder vs. LESS, LoGRA, RDS+, TF-IDF, untrained encoder; 3 seeds | `bash scripts/agreement_fig1.sh` | `results/fig1_dolci/biggpu/seed{0,1,2}/` |
+| Distillation-size scaling and amortization (Fig. 1 panels) | included above (Parts 2, 3) | same directory |
+| Loss-weight (α) ablation | `bash scripts/agreement_ablations.sh` | `results/fig1_dolci/default/alpha_ablation.json` |
+| Index storage per 1K examples | same script | `results/addendum_storage_{1k,n100}.json` |
+| **DATE-LM** factual attribution (Counterfact, Pythia-1B) and toxicity filtering (XSTest-response Het/Hom) | `bash scripts/datelm.sh` | `experiments/datelm/exp2-{counter,het,hom}-final.json` |
+
+All hyperparameters live in one place per experiment: `experiments/agreement/config.py` (+ `config_biggpu.py`, the
+paper setting) and the constant block at the top of each `experiments/datelm/methods/run_fig2_*.py`.
+
+InfluCoder's distillation is not bit-reproducible on GPU (non-deterministic SDPA backward); expect a spread of
+about ±0.02 in aggregated Spearman / AUPRC across runs. The training-free methods reproduce to ~1e-3.
+
+## Repository layout
+
+```
+influcoder/            the method: data loading, LoRA gradient featurizer + CountSketch, bi-encoder distillation, metrics
+run.py                 end-to-end InfluCoder pipeline (presets sanity / tiny / push / big / paper200)
+baselines/             competitor scorers on the same eval: LoGRA, LESS, RDS+, semantic, TF-IDF, random
+                       + shared harness (common.py: splits, cached ground truth, Spearman; eval_baselines.py: CLI)
+experiments/
+  agreement/           Figure 1 and appendix ablations (Parts 1-3, alpha ablation, storage)
+  datelm/              DATE-LM benchmark integration (vendored upstream code + our run_fig2_*.py runners)
+  dolly_pilot/         earlier Dolly-pool experiments (rank sweep, scaling, OOD)
+  diagnostics/         timing / tuning helpers, not needed for the paper numbers
+scripts/               one shell script per paper result
+data/                  BBH anchors and Dolly candidates
+results/               committed result files behind the paper's numbers and figures
+```
+
+## Acknowledgements
+
+`experiments/datelm/` vendors the [DATE-LM](https://github.com/DataAttributionEval/DATE-LM) benchmark;
+see its own README (TODO: confirm upstream license before release). `baselines/logra/modeling_logra.py` and `baselines/less/less_embeds.py` are adapted
+from the LoGRA and LESS reference implementations.
+
+## Citation
+
+```bibtex
+@inproceedings{influcoder2026,
+  title     = {Influcoder: Distilling Decoders' Gradient Influence Rankings into an Encoder for Data Attribution},
+  author    = {TODO},
+  booktitle = {Proceedings of AACL-IJCNLP 2026},
+  year      = {2026}
+}
+```
