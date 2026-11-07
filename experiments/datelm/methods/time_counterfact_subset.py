@@ -16,7 +16,7 @@ Mirrors dattri.py's actual method construction (get_lora_layers/
 get_lora_modules, same AttributionTask/attributor classes) so the estimate
 reflects the real code path, not an approximation of it.
 
-Usage (from datelm/, with the litgpt/lightning stub packages on
+Usage (from experiments/datelm/, with the litgpt/lightning stub packages on
 PYTHONPATH -- see run_repsim_counterfact.py's docstring for why/what):
     PYTHONPATH=_stubs:. ../.venv_h100/bin/python methods/time_counterfact_subset.py \
         --method LESS --n_a 30 --n_b 150

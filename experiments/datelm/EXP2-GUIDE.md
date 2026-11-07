@@ -244,7 +244,7 @@ directory to force recomputation.
 ## 8. Reproducing a number
 
 ```bash
-cd datelm
+cd experiments/datelm
 export PYTHONPATH="_stubs:.:$PYTHONPATH"
 
 python methods/run_fig2_toxicity.py --method less        # -> results/fig2_toxicity.json

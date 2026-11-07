@@ -23,7 +23,7 @@ path, not an approximation of it. Mirrors run_repsim_counterfact.py's
 model-load-vs-compute split (t_model_load reported separately from the timed
 compute) and its litgpt/lightning stub requirement (see PYTHONPATH note below).
 
-Usage (from datelm/, with the stub packages on PYTHONPATH):
+Usage (from experiments/datelm/, with the stub packages on PYTHONPATH):
     PYTHONPATH=_stubs:. ../.venv_py311/bin/python methods/time_toxicity_subset.py \
         --method LESS --n_a 30 --n_b 150
     PYTHONPATH=_stubs:. ../.venv_py311/bin/python methods/time_toxicity_subset.py \
