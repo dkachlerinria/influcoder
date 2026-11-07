@@ -15,7 +15,7 @@ from baselines.common import tokenized_dataset
 
 @torch.no_grad()
 def weighted_mean_embeds(model, dataloader, device) -> torch.Tensor:
-    """Public (not `_`-prefixed) so `experiments.agreement.part3` can time just this
+    """Public (not `_`-prefixed) so `experiments.exp1.part3` can time just this
     per-sample representation step directly, the same way it reuses LoGRA's
     `encode_sorted` -- without going through `score_rdsplus`'s full
     anchor-vs-pool matmul, which is out of scope for a process-only timing."""

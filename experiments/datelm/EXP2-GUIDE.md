@@ -225,11 +225,8 @@ different GPU models.
 | file | purpose |
 |---|---|
 | `methods/make_final_jsons.py` | regenerates the three `exp2-*-final.json` |
-| `methods/exp_influcoder_sweep.py` | hyperparameter sweep; writes to its own dir, never touches official results |
-| `methods/exp_hard_ratio_stability.py` | the hard-mining / stability probe |
-| `methods/bench_embed.py` | isolated `embed()` throughput benchmark |
 | `methods/influcoder/grad_cache.py` | caches teacher gradients (see below) |
-| `results_influcoder_sweep/summary.json` | all 28 sweep runs — the evidence for §6 |
+| `results_influcoder_sweep/summary.json` | all 28 sweep runs — the evidence for §6 (the sweep/stability/benchmark scripts that produced it are in the git history, commit `d84c4ac`) |
 
 **Gradient cache.** Teacher gradients depend only on the seeded pools and the
 fixed checkpoint, never on any training hyperparameter, so they are computed
