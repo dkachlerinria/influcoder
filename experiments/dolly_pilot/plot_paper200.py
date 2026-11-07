@@ -37,12 +37,12 @@ SURFACE = "#fcfcfb"
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--logra", default="baselines/out/paper200_logra_native.json")
+    ap.add_argument("--logra", default="results/paper200_logra_native.json")
     ap.add_argument("--influcoder_agg", type=float, default=0.4978)
     ap.add_argument("--influcoder_pa", type=float, default=0.3922)
     ap.add_argument("--untrained_agg", type=float, default=-0.0406)
     ap.add_argument("--metric", default="agg", choices=["agg", "per_anchor"])
-    ap.add_argument("--out", default="baselines/out/paper200_rank_curve")
+    ap.add_argument("--out", default="results/paper200_rank_curve")
     args = ap.parse_args()
 
     d = json.loads(Path(args.logra).read_text())

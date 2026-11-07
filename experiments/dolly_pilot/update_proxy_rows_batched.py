@@ -2,7 +2,7 @@
 """Patch table1.json in place: re-score the two LoGRA PROXY rows (1.7B, 0.6B
 at rank=32) at their max-feasible batch size instead of the official
 batch_size=1. batch_size=4 for both -- the ceiling found in
-baselines/time_logra_batch.py's sweep (both OOM at batch=8; the main
+experiments/diagnostics/time_logra_batch.py's sweep (both OOM at batch=8; the main
 logra_r8/4B row already OOMs at batch=4, so it is left untouched at
 batch_size=1 and this script does not re-score it).
 
@@ -16,7 +16,7 @@ uses batch=1 throughout). Kept as a separate script rather than folded into
 figure1_table.py's default so the apples-to-apples batch=1 methodology stays
 the one-command reproducible path.
 
-    python -m baselines.update_proxy_rows_batched --preset fig1_dolci
+    python -m experiments.dolly_pilot.update_proxy_rows_batched --preset fig1_dolci
 """
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ import json
 from pathlib import Path
 
 from baselines.common import PRESETS, ground_truth
-from baselines.figure1_table import MODEL, GT_LORA_RANK, run_row
+from experiments.dolly_pilot.figure1_table import MODEL, GT_LORA_RANK, run_row
 from baselines.logra.score import score_logra
 
 BATCH_SIZE = 4
@@ -35,7 +35,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--preset", default="fig1_dolci", choices=list(PRESETS))
     args = ap.parse_args()
-    table = Path("baselines/out") / args.preset / "table1.json"
+    table = Path("results") / args.preset / "table1.json"
 
     data = json.loads(table.read_text())
     gt, splits, cfg = ground_truth(args.preset, seed=0, grad_model=MODEL, lora_rank=GT_LORA_RANK)

@@ -5,7 +5,7 @@ seed. Purely a training/inference-side change (average of independently
 distilled encoders' score matrices) -- the eval GT and LoGRA target are
 untouched.
 
-    python -m baselines.ensemble_influcoder --gt_preset paper200x3 \
+    python -m experiments.diagnostics.ensemble_influcoder --gt_preset paper200x3 \
         --n_train_a 1500 --n_train_p 3000 --hard_ratio 0.6 --seeds 0 1 2
 """
 from __future__ import annotations
@@ -23,7 +23,7 @@ from influcoder.encoder import distill, embed, load_encoder
 from influcoder.metrics import spearman_metrics
 
 MODEL = "Qwen/Qwen3-4B"
-OUT_DIR = Path("baselines/out/qwen4b_tuning")
+OUT_DIR = Path("results/qwen4b_tuning")
 
 
 def main():

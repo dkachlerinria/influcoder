@@ -130,10 +130,10 @@ def main():
     ap.add_argument("--grad_model", default=DEFAULT_GRAD_MODEL)
     ap.add_argument("--encoder_model", default="jhu-clsp/ettin-encoder-68m")
     ap.add_argument("--lora_rank", type=int, default=8)
-    ap.add_argument("--out", default=None, help="default: baselines/out/<preset>/scaling.json")
+    ap.add_argument("--out", default=None, help="default: results/<preset>/scaling.json")
     args = ap.parse_args()
 
-    out = Path(args.out or f"baselines/out/{args.preset}/scaling.json")
+    out = Path(args.out or f"results/{args.preset}/scaling.json")
     out.parent.mkdir(parents=True, exist_ok=True)
 
     gt, splits, cfg = ground_truth(args.preset, seed=0, grad_model=args.grad_model,

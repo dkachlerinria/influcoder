@@ -6,7 +6,7 @@ This experiment sweeps the `alpha` hyperparameter in `pearson_kl_loss` for the `
 - Model: `jhu-clsp/ettin-encoder-68m`
 - Seeds: `[0, 1, 2]`
 - Epochs: `4` (early stopping evaluation)
-- Output Location: `baselines/out/fig1_dolci/default/alpha_ablation.json`
+- Output Location: `results/fig1_dolci/default/alpha_ablation.json`
 
 ## Results
 Averages and sample standard deviations (±) across the 3 seeds, evaluated at Epoch 4 (Final) and at the Best Checkpoint (Peak).

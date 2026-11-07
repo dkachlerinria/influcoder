@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """EXP1 Part 2 (BIG_GPU_FINAL) plot: InfluCoder training-sample scaling.
 
-Reads `baselines/out/<preset>/<profile>/exp1_part2.json` (written by
+Reads `results/<preset>/<profile>/exp1_part2.json` (written by
 `part2.py`) and produces `exp1_part2_figure.{png,pdf}` in the same directory.
 Same visual language as `plot_part1.py`: InfluCoder in C_FWD (single-forward
 cost class), LESS/LoGRA gradient reference lines in C_GRAD -- drawn as
@@ -12,7 +12,7 @@ fresh here rather than borrowed from Part 1). Solid=4B, dashed=1.7B; LESS vs
 LoGRA distinguished by label text and line weight, not a second hue -- both
 are "gradient fwd+bwd" cost-class, matching Part 1's convention.
 
-    python -m baselines.exp1.plot_part2
+    python -m experiments.agreement.plot_part2
 """
 from __future__ import annotations
 
@@ -40,8 +40,8 @@ GRID = "#e3e2df"
 # collect_results.py from Part 1/2/3's raw outputs), not exp1_part2.json
 # directly -- one file every plot script reads its numbers from, so there is
 # exactly one place to look to see what actually drove Figure 1.
-IN_RESULTS = Path("baselines/out") / cfg.PRESET / cfg.PROFILE / cfg.seed_dir(cfg.SEED) / "EXP1_results.json"
-OUT_PATH = Path("baselines/out") / cfg.PRESET / cfg.PROFILE / cfg.seed_dir(cfg.SEED) / "exp1_part2_figure"
+IN_RESULTS = Path("results") / cfg.PRESET / cfg.PROFILE / cfg.seed_dir(cfg.SEED) / "EXP1_results.json"
+OUT_PATH = Path("results") / cfg.PRESET / cfg.PROFILE / cfg.seed_dir(cfg.SEED) / "exp1_part2_figure"
 
 # label, linestyle, linewidth, label_dy (points -- nudged to avoid collisions
 # when two reference lines land close together in data units)

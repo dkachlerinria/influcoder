@@ -2,24 +2,24 @@
 """EXP1 Part 2: InfluCoder Training-Sample Scaling.
 
 How does InfluCoder's distillation quality scale with the number of training
-samples, holding everything else fixed? Reuses `baselines.exp1.train`'s
+samples, holding everything else fixed? Reuses `experiments.agreement.train`'s
 canonical training call (same epochs/hard_ratio/lr/seed/epoch-selection
 convention Part 1's checkpoints use -- previously these had drifted, see
 EXP1.md section 4), and evaluates on the SAME eval slice Part 1 defaults to
 (config.N_EVAL), so LESS/LoGRA reference lines can be recomputed FRESH here
-(via `baselines.exp1.methods`) instead of borrowed from a different-eval-size
+(via `experiments.agreement.methods`) instead of borrowed from a different-eval-size
 Part 1 run.
 
 `SIZES` includes `config.N_TRAIN_A` (1500) -- the exact size Part 1's real
 checkpoint is trained at -- so that sweep point is directly comparable to
-(not just near) Part 1's own `influcoder_68m` row. If `baselines/out/<preset>/
+(not just near) Part 1's own `influcoder_68m` row. If `results/<preset>/
 exp1_part1.json` already exists, this script cross-checks that point against
 it and prints the delta as a sanity check: since both now share the identical
 training methodology and eval, they should agree closely (any gap indicates
 GPU kernel non-determinism, not a methodology difference).
 
-    python -m baselines.exp1.part2
-    python -m baselines.exp1.part2 --sizes 25 100 500 1500
+    python -m experiments.agreement.part2
+    python -m experiments.agreement.part2 --sizes 25 100 500 1500
 """
 from __future__ import annotations
 
@@ -35,8 +35,8 @@ else:
     from . import config as cfg
 from . import data, methods, train
 
-OUT = Path("baselines/out") / cfg.PRESET / cfg.PROFILE / cfg.seed_dir(cfg.SEED) / "exp1_part2.json"
-PART1_OUT = Path("baselines/out") / cfg.PRESET / cfg.PROFILE / cfg.seed_dir(cfg.SEED) / "exp1_part1.json"
+OUT = Path("results") / cfg.PRESET / cfg.PROFILE / cfg.seed_dir(cfg.SEED) / "exp1_part2.json"
+PART1_OUT = Path("results") / cfg.PRESET / cfg.PROFILE / cfg.seed_dir(cfg.SEED) / "exp1_part1.json"
 DEFAULT_SIZES = [25, 50, 100, 250, 500, 750, 1000, cfg.N_TRAIN_A]
 
 

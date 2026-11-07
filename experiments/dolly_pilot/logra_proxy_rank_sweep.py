@@ -19,7 +19,7 @@ from baselines.logra.score import score_logra
 
 MODEL = "Qwen/Qwen3-4B"
 PRESET = "fig1"
-OUT = Path("baselines/out/fig1/logra_proxy_rank_sweep.json")
+OUT = Path("results/fig1/logra_proxy_rank_sweep.json")
 
 PROXIES = {"1.7B": "Qwen/Qwen3-1.7B", "0.6B": "Qwen/Qwen3-0.6B"}
 RANKS = [16, 32]

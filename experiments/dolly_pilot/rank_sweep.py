@@ -13,7 +13,7 @@ rather than a single arbitrary operating point.
 
 Scored on the identical fixed eval + GT as every other number in this repo.
 
-    python -m baselines.rank_sweep --logra_ranks 2 4 8 16 32 --less_ranks 8 16 32 128
+    python -m experiments.dolly_pilot.rank_sweep --logra_ranks 2 4 8 16 32 --less_ranks 8 16 32 128
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ def main():
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
 
-    out = Path(args.out or f"baselines/out/{args.preset}/rank_sweep.json")
+    out = Path(args.out or f"results/{args.preset}/rank_sweep.json")
     out.parent.mkdir(parents=True, exist_ok=True)
 
     gt, splits, cfg = ground_truth(args.preset, seed=0, grad_model=args.grad_model,

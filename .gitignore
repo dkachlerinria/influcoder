@@ -27,7 +27,7 @@ baselines/cache/
 
 # NOTE: data/ (BBH eval subset) and data/dolly/ (dolly_data.jsonl) are intentionally
 # NOT ignored -- they're small, fixed inputs checked in for reproducibility.
-# baselines/out/ (tables, plots) is also intentionally NOT ignored -- those
+# results/ (tables, plots) is also intentionally NOT ignored -- those
 # are the actual results, not scratch.
 
 # flock sentinels created by save_summary() at runtime
@@ -41,4 +41,4 @@ datelm/results_hardratio_stability/
 datelm/results_influcoder_sweep/*/
 
 # addendum storage run log (numbers live in addendum_storage.json)
-baselines/out/_addendum_run.log
+results/_addendum_run.log

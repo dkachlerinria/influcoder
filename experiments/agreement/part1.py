@@ -4,8 +4,8 @@
 For a fixed eval, how good is each method (aggregate Spearman rho vs. the
 Qwen3-4B gradient-influence ground truth) and how expensive is it per
 candidate (inference ms/sample)? Every method is scored through
-`baselines.exp1.methods`'s canonical wrappers, so every rank/attn/max_len
-value comes from `baselines.exp1.config` -- see that module's docstring for
+`experiments.agreement.methods`'s canonical wrappers, so every rank/attn/max_len
+value comes from `experiments.agreement.config` -- see that module's docstring for
 why this matters.
 
 InfluCoder's 68m/150m checkpoints are trained once (at config.N_TRAIN_A/
@@ -13,9 +13,9 @@ N_TRAIN_P, the "anchor point" Part 2's sweep also passes through -- see
 EXP1.md section 4.2.2) and reused on subsequent runs; pass --retrain to force
 retraining even if a checkpoint already exists at runs_out/<preset>/encoder_*.
 
-    python -m baselines.exp1.part1
-    python -m baselines.exp1.part1 --n_eval 50   # fast peek, not the default
-    python -m baselines.exp1.part1 --retrain
+    python -m experiments.agreement.part1
+    python -m experiments.agreement.part1 --n_eval 50   # fast peek, not the default
+    python -m experiments.agreement.part1 --retrain
 """
 from __future__ import annotations
 
@@ -35,7 +35,7 @@ else:
 from . import data, methods, train
 
 ENC_DIR = Path("runs_out") / cfg.PRESET / cfg.PROFILE / cfg.seed_dir(cfg.SEED)
-OUT = Path("baselines/out") / cfg.PRESET / cfg.PROFILE / cfg.seed_dir(cfg.SEED) / "exp1_part1.json"
+OUT = Path("results") / cfg.PRESET / cfg.PROFILE / cfg.seed_dir(cfg.SEED) / "exp1_part1.json"
 
 
 def ensure_checkpoint(size: str, encoder_model: str, splits, full_gt_eval_texts, retrain: bool):

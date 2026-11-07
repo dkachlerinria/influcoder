@@ -10,7 +10,7 @@ model does and should be run at a correspondingly larger batch in practice.
 This sweeps batch_size per model (catching OOM) and checks scores don't drift
 from the batch_size=1 reference, so a real win here isn't silently wrong.
 
-    python -m baselines.time_logra_batch --grad_model Qwen/Qwen3-0.6B --rank 32 \
+    python -m experiments.diagnostics.time_logra_batch --grad_model Qwen/Qwen3-0.6B --rank 32 \
         --batch_sizes 1 4 8 16 32 64
 """
 from __future__ import annotations

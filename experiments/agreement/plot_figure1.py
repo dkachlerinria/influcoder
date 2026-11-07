@@ -23,7 +23,7 @@ plot_part{1,2,3}.py) ever re-derives a number that isn't already sitting in
 that file, so the figure is always exactly what's on disk, not a script's
 in-memory recomputation of it.
 
-    python -m baselines.exp1.plot_figure1
+    python -m experiments.agreement.plot_figure1
 """
 from __future__ import annotations
 
@@ -41,8 +41,8 @@ else:
     from . import config as cfg
 from . import plot_part1, plot_part2, plot_part3
 
-IN_RESULTS = Path("baselines/out") / cfg.PRESET / cfg.PROFILE / cfg.seed_dir(cfg.SEED) / "EXP1_results.json"
-OUT_PATH = Path("baselines/out") / cfg.PRESET / cfg.PROFILE / cfg.seed_dir(cfg.SEED) / "figure1"
+IN_RESULTS = Path("results") / cfg.PRESET / cfg.PROFILE / cfg.seed_dir(cfg.SEED) / "EXP1_results.json"
+OUT_PATH = Path("results") / cfg.PRESET / cfg.PROFILE / cfg.seed_dir(cfg.SEED) / "figure1"
 
 
 def main():

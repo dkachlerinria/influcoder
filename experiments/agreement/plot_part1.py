@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """EXP1 Part 1 (BIG_GPU_FINAL) plot: cost vs quality.
 
-Reads `baselines/out/<preset>/exp1_part1.json` (written by `part1.py`) and
-produces `baselines/out/<preset>/exp1_part1_figure.{png,pdf}`. Same visual
+Reads `results/<preset>/exp1_part1.json` (written by `part1.py`) and
+produces `results/<preset>/exp1_part1_figure.{png,pdf}`. Same visual
 language as this session's earlier draft figures (see EXP1.md section 5.5/5.6
 and `.tuning_logs/plot_vercors18_part1.py`, which this script's design is
 carried forward from): categorical color by cost-class (gradient fwd+bwd =
@@ -21,7 +21,7 @@ LESS-4B) -- starting the visible axis at 1ms avoids wasting space on the
 sub-1ms region nothing but TF-IDF's now-irrelevant literal x-position would
 have occupied.
 
-    python -m baselines.exp1.plot_part1
+    python -m experiments.agreement.plot_part1
 """
 from __future__ import annotations
 
@@ -55,8 +55,8 @@ GRID = "#e3e2df"
 # collect_results.py from Part 1/2/3's raw outputs), not exp1_part1.json
 # directly -- one file every plot script reads its numbers from, so there is
 # exactly one place to look to see what actually drove Figure 1.
-IN_RESULTS = Path("baselines/out") / cfg.PRESET / cfg.PROFILE / cfg.seed_dir(cfg.SEED) / "EXP1_results.json"
-OUT_PATH = Path("baselines/out") / cfg.PRESET / cfg.PROFILE / cfg.seed_dir(cfg.SEED) / "exp1_part1_figure"
+IN_RESULTS = Path("results") / cfg.PRESET / cfg.PROFILE / cfg.seed_dir(cfg.SEED) / "EXP1_results.json"
+OUT_PATH = Path("results") / cfg.PRESET / cfg.PROFILE / cfg.seed_dir(cfg.SEED) / "exp1_part1_figure"
 
 # (label, marker, size_pt, color, filled, family, size_rank)
 # LESS is now TWO full families -- "less_r8" (practical) and "less_r32"

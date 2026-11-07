@@ -6,14 +6,14 @@ features are cached (baselines/common.ground_truth, baselines.scaling_sweep.
 train_features), so after the first call every experiment pays only for
 encoder training -- no repeat 4B forward/backward passes.
 
-Every run appends one JSON line to baselines/out/qwen4b_tuning/log.jsonl
+Every run appends one JSON line to results/qwen4b_tuning/log.jsonl
 (never overwritten, so the full experiment history survives) and, if it beats
-the best `agg` seen so far (tracked in baselines/out/qwen4b_tuning/best.json),
+the best `agg` seen so far (tracked in results/qwen4b_tuning/best.json),
 saves the encoder to runs_out/qwen4b_tuning/<name>/encoder.
 
-    python -m baselines.tune_influcoder --name baseline
-    python -m baselines.tune_influcoder --name accum4 --grad_accum_steps 4
-    python -m baselines.tune_influcoder --name big2x --n_train_a 1000 --n_train_p 2000
+    python -m experiments.diagnostics.tune_influcoder --name baseline
+    python -m experiments.diagnostics.tune_influcoder --name accum4 --grad_accum_steps 4
+    python -m experiments.diagnostics.tune_influcoder --name big2x --n_train_a 1000 --n_train_p 2000
 """
 from __future__ import annotations
 
@@ -32,7 +32,7 @@ from influcoder.encoder import distill, embed, load_encoder
 from influcoder.metrics import spearman_metrics
 
 MODEL = "Qwen/Qwen3-4B"
-OUT_DIR = Path("baselines/out/qwen4b_tuning")
+OUT_DIR = Path("results/qwen4b_tuning")
 ENC_DIR = Path("runs_out/qwen4b_tuning")
 LOG_PATH = OUT_DIR / "log.jsonl"
 BEST_PATH = OUT_DIR / "best.json"

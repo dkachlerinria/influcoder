@@ -4,7 +4,7 @@
 why) instead of re-running the full 12-row table. Timing-only
 (measure_flops=False) -- FLOPs are deferred to an appendix experiment, see
 run_row's docstring. score_logra now defaults attn_implementation="sdpa"
-(verified in baselines/verify_logra_sdpa.py: aggregated rho moves only
+(verified in experiments/diagnostics/verify_logra_sdpa.py: aggregated rho moves only
 +0.0046 vs the old eager default -- noise-level -- while cutting ms/sample
 ~10-28%); batch_size stays at 1 (verified unsafe to raise -- see
 INFLUCODER_FINDINGS.md's batching section).
@@ -15,7 +15,7 @@ import json
 from pathlib import Path
 
 from baselines.common import ground_truth
-from baselines.figure1_table import MODEL, GT_LORA_RANK, PRESET, OUT_DIR, run_row
+from experiments.dolly_pilot.figure1_table import MODEL, GT_LORA_RANK, PRESET, OUT_DIR, run_row
 from baselines.logra.score import score_logra
 
 TABLE = OUT_DIR / "table1.json"

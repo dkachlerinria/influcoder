@@ -180,7 +180,7 @@ def _part1_cached_aggregated(label: str, fingerprint: dict):
     before this existed. (Older Part 1 files without a per-row
     "config_fingerprint" simply never match -- None != any real dict --
     so they correctly fall back to recompute rather than silently misfire.)"""
-    part1_path = Path("baselines/out") / cfg.PRESET / cfg.PROFILE / cfg.seed_dir(cfg.SEED) / "exp1_part1.json"
+    part1_path = Path("results") / cfg.PRESET / cfg.PROFILE / cfg.seed_dir(cfg.SEED) / "exp1_part1.json"
     if not part1_path.exists():
         return None
     try:

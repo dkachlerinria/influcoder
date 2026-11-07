@@ -41,9 +41,9 @@ SURFACE = "#fcfcfb"
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--scaling", default="baselines/out/big/scaling.json")
-    ap.add_argument("--ranks", default="baselines/out/big/rank_sweep.json")
-    ap.add_argument("--out", default="baselines/out/big/scaling_vs_competitors")
+    ap.add_argument("--scaling", default="results/big/scaling.json")
+    ap.add_argument("--ranks", default="results/big/rank_sweep.json")
+    ap.add_argument("--out", default="results/big/scaling_vs_competitors")
     ap.add_argument("--metric", default="agg", choices=["agg", "per_anchor"])
     args = ap.parse_args()
 

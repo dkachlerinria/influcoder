@@ -8,9 +8,9 @@ environment before running any part -- every consumer (`data.py`,
 `if os.environ.get("EXP1_CONFIG") == "biggpu": from . import config_biggpu as cfg`,
 so nothing else needs to change:
 
-    EXP1_CONFIG=biggpu python -m baselines.exp1.part1
-    EXP1_CONFIG=biggpu python -m baselines.exp1.part2
-    EXP1_CONFIG=biggpu python -m baselines.exp1.part3
+    EXP1_CONFIG=biggpu python -m experiments.agreement.part1
+    EXP1_CONFIG=biggpu python -m experiments.agreement.part2
+    EXP1_CONFIG=biggpu python -m experiments.agreement.part3
 
 This module inherits every value from `config.py` unchanged (`from .config
 import *`) and then overrides ONLY the ones that genuinely change for the

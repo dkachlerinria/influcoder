@@ -13,9 +13,9 @@ the anchor-vs-pool scoring matmul, which is out of scope (depends on
 query-set size). Because this part only times wall-clock rather than scoring
 quality, its code path necessarily looks different from Parts 1/2 (no
 `report()`/GT comparison) -- but every model it loads goes through
-`baselines.exp1.methods.load_less_model`/`load_logra_model`/
+`experiments.agreement.methods.load_less_model`/`load_logra_model`/
 `load_rdsplus_model` (same rank/attn/block_size Part 1 uses) and its
-InfluCoder training goes through `baselines.exp1.train.train_influcoder`
+InfluCoder training goes through `experiments.agreement.train.train_influcoder`
 (same epochs/hard_ratio/lr/seed Parts 1 and 2 use), so the PARAMETERS are
 identical even though the orchestration isn't.
 
@@ -33,9 +33,9 @@ enough real, non-duplicated text to eventually cover 100K/1M (BBH caps at
 Run the two halves as separate GPU jobs in parallel (no shared GPU-memory
 contention) via --only:
 
-    python -m baselines.exp1.part3 --only less_logra
-    python -m baselines.exp1.part3 --only influcoder
-    python -m baselines.exp1.part3 --only both   # sequential, one GPU
+    python -m experiments.agreement.part3 --only less_logra
+    python -m experiments.agreement.part3 --only influcoder
+    python -m experiments.agreement.part3 --only both   # sequential, one GPU
 """
 from __future__ import annotations
 
@@ -73,8 +73,8 @@ INFLUCODER_PROCESS_SIZES = [100, 1_000, 10_000, 100_000]  # 100K measured direct
 # BIG_GPU_FINAL widens both to match Parts 1/2's full families and real
 # training-set size.
 
-OUT_LESS_LOGRA = Path("baselines/out") / cfg.PRESET / cfg.PROFILE / cfg.seed_dir(cfg.SEED) / "exp1_part3_less_logra.json"
-OUT_INFLUCODER = Path("baselines/out") / cfg.PRESET / cfg.PROFILE / cfg.seed_dir(cfg.SEED) / "exp1_part3_influcoder.json"
+OUT_LESS_LOGRA = Path("results") / cfg.PRESET / cfg.PROFILE / cfg.seed_dir(cfg.SEED) / "exp1_part3_less_logra.json"
+OUT_INFLUCODER = Path("results") / cfg.PRESET / cfg.PROFILE / cfg.seed_dir(cfg.SEED) / "exp1_part3_influcoder.json"
 
 
 def _logra_encode(logra, ds, is_test):

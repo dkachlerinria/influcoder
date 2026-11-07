@@ -154,8 +154,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--preset", default="fig1")
     args = ap.parse_args()
-    results_path = Path("baselines/out") / args.preset / "table1.json"
-    out = str(Path("baselines/out") / args.preset / "figure1")
+    results_path = Path("results") / args.preset / "table1.json"
+    out = str(Path("results") / args.preset / "figure1")
     data = json.loads(results_path.read_text())
     rows = []
     tfidf_agg = None

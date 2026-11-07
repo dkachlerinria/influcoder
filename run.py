@@ -113,7 +113,7 @@ PRESETS = {
     # support up to ~8000 tokens so this is well within capacity.
     # n_eval_a/n_eval_p raised 400 -> 800 for the BIG_GPU_FINAL_EXP1 final run
     # (explicit instruction: "full clean run at 800x800"). This is the ceiling
-    # `baselines.exp1.data.load_gt_and_splits(n_eval=...)` can slice DOWN from
+    # `experiments.agreement.data.load_gt_and_splits(n_eval=...)` can slice DOWN from
     # (it front-slices the cached full preset eval, never up) -- ground_truth's
     # cache key includes n_eval_a/n_eval_p, so this produces a genuinely new
     # gt_fig1_dolci_*.pt cache entry rather than colliding with the old 400x400

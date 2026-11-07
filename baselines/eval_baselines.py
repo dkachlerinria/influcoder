@@ -87,10 +87,10 @@ def main():
     ap.add_argument("--encoder_max_len", type=int, default=512,
                     help="matches run.py's load_encoder default, so the semantic / "
                          "influcoder rows reproduce run.py's numbers exactly")
-    ap.add_argument("--out_dir", default=None, help="default: baselines/out/<preset>")
+    ap.add_argument("--out_dir", default=None, help="default: results/<preset>")
     args = ap.parse_args()
 
-    out_dir = Path(args.out_dir or f"baselines/out/{args.preset}")
+    out_dir = Path(args.out_dir or f"results/{args.preset}")
     out_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"building ground truth for preset '{args.preset}' ...")

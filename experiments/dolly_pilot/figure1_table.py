@@ -18,7 +18,7 @@ FLOP-counted pass (FlopCounterMode inflates wall-clock, so never trust
 timing under it), analytic terms added for anything the counter can't see
 (LoGRA's pinv).
 
-    python -m baselines.figure1_table
+    python -m experiments.dolly_pilot.figure1_table
 """
 from __future__ import annotations
 
@@ -35,7 +35,7 @@ from baselines.cost import CostMeter, flop_counter, summarize, sync
 MODEL = "Qwen/Qwen3-4B"
 GT_LORA_RANK = 16
 PRESET = "fig1"
-OUT_DIR = Path("baselines/out/fig1")
+OUT_DIR = Path("results/fig1")
 ENC_DIR = Path("runs_out/fig1")
 
 ENCODER_MODELS = {
@@ -86,7 +86,7 @@ def main():
     ap.add_argument("--preset", default=PRESET, choices=list(PRESETS))
     args = ap.parse_args()
     preset = args.preset
-    out_dir = Path("baselines/out") / preset
+    out_dir = Path("results") / preset
     enc_dir = Path("runs_out") / preset
 
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -105,7 +105,7 @@ def main():
         splits, cfg, gt, n_samples, all_metrics)
 
     # -- LoGRA (rank=8), full-fidelity + two cheaper same-family proxies ------
-    # Proxies use rank=32, not 8: a rank sweep (baselines/logra_proxy_rank_sweep.py)
+    # Proxies use rank=32, not 8: a rank sweep (experiments/dolly_pilot/logra_proxy_rank_sweep.py)
     # found the 1.7B proxy genuinely improves with rank (+0.287 @ r8 -> +0.503 @
     # r16 -> +0.511 @ r32, plateauing), while the 0.6B proxy stays pinned near
     # zero at every rank tested -- its failure isn't a rank/capacity problem.

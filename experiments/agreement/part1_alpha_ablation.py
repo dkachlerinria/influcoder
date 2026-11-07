@@ -7,10 +7,10 @@ import numpy as np
 
 import os as _os
 if _os.environ.get("EXP1_CONFIG") == "biggpu":
-    from baselines.exp1 import config_biggpu as cfg
+    from experiments.agreement import config_biggpu as cfg
 else:
-    from baselines.exp1 import config as cfg
-from baselines.exp1 import data, train
+    from experiments.agreement import config as cfg
+from experiments.agreement import data, train
 
 def main():
     ap = argparse.ArgumentParser()
@@ -57,7 +57,7 @@ def main():
             gc.collect()
             torch.cuda.empty_cache()
 
-    OUT = Path("baselines/out") / cfg.PRESET / cfg.PROFILE / "alpha_ablation.json"
+    OUT = Path("results") / cfg.PRESET / cfg.PROFILE / "alpha_ablation.json"
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(all_metrics, indent=2))
     print(f"\nWrote ablation results to {OUT}")

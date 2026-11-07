@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """EXP1 Part 3 (BIG_GPU_FINAL) plot: GPU-time vs samples-processed amortization.
 
-Reads `baselines/out/<preset>/<profile>/exp1_part3_{less_logra,influcoder}.json`
+Reads `results/<preset>/<profile>/exp1_part3_{less_logra,influcoder}.json`
 (written by `part3.py`) and produces `exp1_part3_figure.{png,pdf}`. Same visual
 language as this session's earlier standalone/combined Part 3 figures (see
 EXP1.md section 7.6/8.4 and `.tuning_logs/plot_part3.py`): log-x cumulative
@@ -18,7 +18,7 @@ was itself an extrapolation from n=10,000). LESS/LoGRA are only measured at
 n=100/1,000 (cost-prohibitive beyond that) and extrapolated from the n=1,000
 rate for the 10K/100K/1M marker points and the crossover computation.
 
-    python -m baselines.exp1.plot_part3
+    python -m experiments.agreement.plot_part3
 """
 from __future__ import annotations
 
@@ -52,8 +52,8 @@ GRID = "#e3e2df"
 # exp1_part3_{less_logra,influcoder}.json directly -- one file every plot
 # script reads its numbers from, so there is exactly one place to look to
 # see what actually drove Figure 1.
-IN_RESULTS = Path("baselines/out") / cfg.PRESET / cfg.PROFILE / cfg.seed_dir(cfg.SEED) / "EXP1_results.json"
-OUT_PATH = Path("baselines/out") / cfg.PRESET / cfg.PROFILE / cfg.seed_dir(cfg.SEED) / "exp1_part3_figure"
+IN_RESULTS = Path("results") / cfg.PRESET / cfg.PROFILE / cfg.seed_dir(cfg.SEED) / "EXP1_results.json"
+OUT_PATH = Path("results") / cfg.PRESET / cfg.PROFILE / cfg.seed_dir(cfg.SEED) / "exp1_part3_figure"
 
 FLOOR = 0.5
 X_MIN = 5

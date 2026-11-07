@@ -12,7 +12,7 @@ script's own output, not introduced here. Run this AFTER Part 1/2/3 have all
 written their outputs; refuses to run (loudly) if any source is missing
 rather than silently omitting a section.
 
-    python -m baselines.exp1.collect_results
+    python -m experiments.agreement.collect_results
 """
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ if _os.environ.get("EXP1_CONFIG") == "biggpu":
 else:
     from . import config as cfg
 
-OUT_DIR = Path("baselines/out") / cfg.PRESET / cfg.PROFILE / cfg.seed_dir(cfg.SEED)
+OUT_DIR = Path("results") / cfg.PRESET / cfg.PROFILE / cfg.seed_dir(cfg.SEED)
 OUT_PATH = OUT_DIR / "EXP1_results.json"
 
 SOURCES = {

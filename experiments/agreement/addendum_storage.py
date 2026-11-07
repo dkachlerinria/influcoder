@@ -40,9 +40,9 @@ examples and measures the resulting tensor -- use it on a GPU node to confirm
 the analytic widths.
 
 Usage:
-    python -m baselines.exp1.addendum_storage --n 10
-    python -m baselines.exp1.addendum_storage --n 10 --mode real
-    python -m baselines.exp1.addendum_storage --n 10 --mode real --target Qwen/Qwen3-0.6B
+    python -m experiments.agreement.addendum_storage --n 10
+    python -m experiments.agreement.addendum_storage --n 10 --mode real
+    python -m experiments.agreement.addendum_storage --n 10 --mode real --target Qwen/Qwen3-0.6B
 """
 from __future__ import annotations
 
@@ -308,7 +308,7 @@ def main():
     ap.add_argument("--seed", type=int, default=0, help="cfg.SEED")
     ap.add_argument("--force_cpu_target", action="store_true",
                     help="run the target-model methods on CPU anyway (slow)")
-    ap.add_argument("--out", default="baselines/out/addendum_storage.json")
+    ap.add_argument("--out", default="results/addendum_storage.json")
     args = ap.parse_args()
 
     global STORE_DTYPE

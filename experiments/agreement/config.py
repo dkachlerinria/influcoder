@@ -27,7 +27,7 @@ GT_MODEL = "Qwen/Qwen3-4B"
 GT_LORA_RANK = 16
 # EXP1_SEED env var overrides for a multi-seed sweep (e.g. `EXP1_SEED=1
 # EXP1_INFLUCODER_SEED=1 EXP1_DATA_SEED=1 EXP1_CONFIG=biggpu python -m
-# baselines.exp1.part1`) -- defaults preserve the historical single-seed
+# experiments.agreement.part1`) -- defaults preserve the historical single-seed
 # behavior exactly when unset.
 SEED = int(_os.environ.get("EXP1_SEED", "0"))
 

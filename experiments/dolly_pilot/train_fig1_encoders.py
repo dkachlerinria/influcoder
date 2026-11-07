@@ -13,7 +13,7 @@ Recipe (the plateau-quality config found during tuning, without hard
 mining per the decision to drop it): lr=5e-5, epochs=8, hard_ratio=0.0,
 alpha=0.5 (default -- the alpha=0.3 gain was inside the noise band).
 
-    python -m baselines.train_fig1_encoders
+    python -m experiments.dolly_pilot.train_fig1_encoders
 """
 from __future__ import annotations
 
@@ -43,7 +43,7 @@ def main():
     args = ap.parse_args()
     preset = args.preset
     out_dir = Path("runs_out") / preset
-    results_path = Path("baselines/out") / preset / "train_results.json"
+    results_path = Path("results") / preset / "train_results.json"
 
     results_path.parent.mkdir(parents=True, exist_ok=True)
     gt, splits, cfg = ground_truth(preset, seed=0, grad_model=MODEL, lora_rank=GT_LORA_RANK)

@@ -136,8 +136,8 @@ def panel(ax, rows, xkey, xlabel, title, floor_note):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--results", default="baselines/out/big/baseline_results.json")
-    ap.add_argument("--out", default="baselines/out/big/cost_vs_quality")
+    ap.add_argument("--results", default="results/big/baseline_results.json")
+    ap.add_argument("--out", default="results/big/cost_vs_quality")
     args = ap.parse_args()
 
     data = json.loads(Path(args.results).read_text())
