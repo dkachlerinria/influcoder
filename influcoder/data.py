@@ -108,7 +108,7 @@ def load_dolci_instruct(seed: int, max_docs: int = 6000) -> list[Sample]:
 def load_pool(name: str, seed: int) -> list[Sample]:
     """Dispatch to the pool/candidate loader selected by a preset's `pool` key."""
     if name == "dolly":
-        return load_dolly("dolly/dolly_data.jsonl", seed=seed)
+        return load_dolly("data/dolly/dolly_data.jsonl", seed=seed)
     if name == "dolci_instruct":
         return load_dolci_instruct(seed=seed)
     raise ValueError(f"unknown pool: {name}")

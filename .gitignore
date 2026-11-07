@@ -25,7 +25,7 @@ baselines/cache/
 # Scratch run logs from ad hoc sweeps/tuning sessions.
 .tuning_logs/
 
-# NOTE: data/ (BBH eval subset) and dolly/ (dolly_data.jsonl) are intentionally
+# NOTE: data/ (BBH eval subset) and data/dolly/ (dolly_data.jsonl) are intentionally
 # NOT ignored -- they're small, fixed inputs checked in for reproducibility.
 # baselines/out/ (tables, plots) is also intentionally NOT ignored -- those
 # are the actual results, not scratch.
