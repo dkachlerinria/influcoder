@@ -1,6 +1,6 @@
 # InfluCoder
 
-[![Paper](https://img.shields.io/badge/Paper-AACL--IJCNLP%202026-b31b1b.svg)](TODO-paper-link)
+[![Paper](https://img.shields.io/badge/Paper-AACL--IJCNLP%202026-b31b1b.svg)](https://aclanthology.org/2026.aacl-short.49/)
 [![Python](https://img.shields.io/badge/Python-3.11-blue.svg)](requirements.txt)
 
 InfluCoder is a fast, representation-based data attribution method. Gradient-based methods such as LESS and LoGRA
@@ -9,7 +9,7 @@ gradient-influence rankings into a small text encoder, so scoring a candidate co
 With a 68M encoder it reaches a Spearman correlation of about 0.8 with Qwen3-4B gradient influence, at about 2 ms per
 candidate.
 
-**Paper:** [Influcoder: Distilling Decoders' Gradient Influence Rankings into an Encoder for Data Attribution](TODO-paper-link) (AACL-IJCNLP 2026)
+**Paper:** [Influcoder: Distilling Decoders' Gradient Influence Rankings into an Encoder for Data Attribution](https://aclanthology.org/2026.aacl-short.49/) (AACL-IJCNLP 2026)
 **Authors:** Dimitri Kachler, Damien Sileo, Pascal Denis
 
 <img width="800" alt="Figure 1: agreement with gradient influence vs. inference cost" src="results/fig1_dolci/biggpu/seed0/figure1.png">
