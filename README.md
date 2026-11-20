@@ -149,6 +149,9 @@ bash scripts/datelm.sh        # results -> experiments/datelm/exp2-{counter,het,
 The toxicity tasks need access to the gated HF dataset `allenai/wildguardmix`. Details:
 [`experiments/datelm/EXP2-GUIDE.md`](experiments/datelm/EXP2-GUIDE.md).
 
+The per-example score files behind the reported numbers are in `experiments/datelm/results/`, except InfluCoder (all
+three tasks) and Counterfact BM25: those will come with the data release.
+
 ## Repository Layout
 
 ```
@@ -164,6 +167,11 @@ results/             result files behind the paper's numbers and figures
 
 `baselines/less/` and `baselines/logra/` adapt the [LESS](https://github.com/princeton-nlp/LESS) and LoGRA reference
 implementations; `experiments/datelm/` vendors DATE-LM.
+
+## License
+
+MIT, see [LICENSE](LICENSE). This covers our code. The vendored DATE-LM code in `experiments/datelm/` stays under its
+authors' terms (see [`experiments/datelm/NOTICE`](experiments/datelm/NOTICE)).
 
 ## Citation
 

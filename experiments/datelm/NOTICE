@@ -1,0 +1,5 @@
+This directory vendors code from DATE-LM (https://github.com/DataAttributionEval/DATE-LM)
+by its authors, together with our runners (methods/run_fig2_*.py, methods/influcoder*,
+methods/make_final_jsons.py and related files). The upstream repository declares no license;
+the vendored DATE-LM code remains under its authors' terms and is not covered by the
+MIT license at the root of this repository.
