@@ -10,7 +10,7 @@ With a 68M encoder it reaches a Spearman correlation of about 0.8 with Qwen3-4B 
 candidate.
 
 **Paper:** [Influcoder: Distilling Decoders' Gradient Influence Rankings into an Encoder for Data Attribution](TODO-paper-link) (AACL-IJCNLP 2026)
-**Authors:** TODO
+**Authors:** Dimitri Kachler, Damien Sileo, Pascal Denis
 
 <img width="800" alt="Figure 1: agreement with gradient influence vs. inference cost" src="results/fig1_dolci/biggpu/seed0/figure1.png">
 
@@ -178,7 +178,7 @@ authors' terms (see [`experiments/datelm/NOTICE`](experiments/datelm/NOTICE)).
 ```bibtex
 @inproceedings{influcoder2026,
   title     = {Influcoder: Distilling Decoders' Gradient Influence Rankings into an Encoder for Data Attribution},
-  author    = {TODO},
+  author    = {Kachler, Dimitri and Sileo, Damien and Denis, Pascal},
   booktitle = {Proceedings of AACL-IJCNLP 2026},
   year      = {2026}
 }
